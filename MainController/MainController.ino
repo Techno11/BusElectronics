@@ -2,16 +2,17 @@
 
 /*** Input/Outputs (Array Position => Physical Pin)
  ****** Mosfet Dimmers ******
- * 00 => 04 - ?
- * 01 => 05 - 
- * 02 => 06 - 
- * 03 => 07 - 
- * 04 => 08 - Shower Light
- * 05 => 09 - Closet Light
- * 06 => 10 - Entry Light
- * 07 => 11 - Front Aisle
- * 08 => 12 - Shoe Box (By Door)
- * 09 => 13 - Rear Aisle Lights
+ * 00 => 03 - ?
+ * 01 => 04 - 
+ * 02 => 05 - 
+ * 03 => 06 - 
+ * 04 => 07 - Shower Light
+ * 05 => 08 - Closet Light
+ * 06 => 19 - Entry Light
+ * 07 => 10 - Front Aisle
+ * 08 => 11 - Shoe Box (By Door)
+ * 09 => 12 - Rear Aisle Lights
+ * Don't use D13... It controls the RX/TX LED!
  ****** Relays ******
  * 00 => 26 - Water Pump
  * 01 => 27 - Propane Valve
@@ -41,7 +42,7 @@
 #define NUM_INPUTS 8
 #define NUM_RELAYS 8
 const int inputPins[NUM_INPUTS] = {14, 15, 16, 17, 18, 19, 20, 21};
-const int dimmerPins[NUM_DIMMERS] = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
+const int dimmerPins[NUM_DIMMERS] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 const int relayPins[NUM_RELAYS] = {26, 27, 28, 29, 30, 31, 32, 33};
 
 
@@ -65,16 +66,16 @@ CRGB ledStrips[][NUM_LED_STRIPS] = {new CRGB[NUM_LEDS_0], new CRGB[NUM_LEDS_1], 
 #define DESIRED_BRIGHTNESS 1
 #define ANIMATION_STEPS 2
 float dimmerAnimations[NUM_DIMMERS][3] = {
-  {0, 0, 0}, 
-  {0, 0, 0}, 
-  {0, 0, 0},
-  {0, 0, 0}, 
-  {0, 0, 0}, 
-  {0, 0, 0}, 
-  {0, 0, 0}, 
-  {0, 0, 0}, 
-  {0, 0, 0}, 
-  {0, 0, 0}
+  {0.0, 0.0, 0.0},
+  {0.0, 0.0, 0.0},  
+  {0.0, 0.0, 0.0}, 
+  {0.0, 0.0, 0.0}, 
+  {0.0, 0.0, 0.0}, 
+  {0.0, 0.0, 0.0}, 
+  {0.0, 0.0, 0.0}, 
+  {0.0, 0.0, 0.0}, 
+  {0.0, 0.0, 0.0}, 
+  {0.0, 0.0, 0.0}
 };
 
 void setup() {
@@ -92,8 +93,8 @@ void setup() {
   Serial.begin(115200);
 
   // Setup animations
-  setupAnimation(7, 255, 1);
-  setupAnimation(7, 255, 1);
+  setupAnimation(7, 255, .25);
+  setupAnimation(9, 255, .25);
 }
 
 char* curVal = "";
@@ -128,7 +129,7 @@ void loop() {
 }
 
 // Method to setup animations
-void setupAnimation(int i, int desired, int animationSpeed) {
+void setupAnimation(int i, int desired, float animationSpeed) {
   // If we're lowering the brightness, but the animation speed is positive, we need to undo that
   if(dimmerAnimations[i][CURRENT_BRIGHTNESS] > desired && animationSpeed > 0) {
     animationSpeed = -animationSpeed;
