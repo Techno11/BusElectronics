@@ -1,6 +1,12 @@
+#include <Adafruit_ADS1X15.h>
 #include "FastLED.h"
 
-/*** Input/Outputs (Array Position => Physical Pin)
+/*** Library Breakdown
+ *  Adafruit_ADS1X15 - For Current Sensor
+ *  FastLED - For Individually Adressable LEDs
+ */
+
+/*** Input/Outputs ([Array Position] => [Physical Pin])
  ****** Mosfet Dimmers ******
  * 00 => 03 - ?
  * 01 => 04 - 
@@ -27,7 +33,7 @@
  * 01 => 45 - 
  * 02 => 46 - 
  * 03 => 47 - 
- ****** Inputs ******
+ ****** Digital Inputs ******
  * 00 => 14 - Shower Button
  * 01 => 15 - Closet Door Switches
  * 02 => 16 - Emergency Window
@@ -36,14 +42,19 @@
  * 05 => 19 - [Right 2nd-to-Bottom]
  * 06 => 20 - [Left Bottom]
  * 07 => 21 - [Right Bottom]
+ * 
+ ****** Analog Inputs ******
+ * 00 => 15 - Main Water Tank Sensor
  */
 
 #define NUM_DIMMERS 10
 #define NUM_INPUTS 8
 #define NUM_RELAYS 8
+#define NUM_ANALOG 1
 const int inputPins[NUM_INPUTS] = {14, 15, 16, 17, 18, 19, 20, 21};
 const int dimmerPins[NUM_DIMMERS] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 const int relayPins[NUM_RELAYS] = {26, 27, 28, 29, 30, 31, 32, 33};
+const int analogPins[NUM_ANALOG] = {15};
 
 
 // LED Config
@@ -78,6 +89,11 @@ float dimmerAnimations[NUM_DIMMERS][3] = {
   {0.0, 0.0, 0.0}
 };
 
+// Current Sensor Configuration
+Adafruit_ADS1115 ads;
+const float CS_FACTOR = 100; //100A/1V from the CT
+const float CS_MULTIPLIER = 0.00005;
+
 void setup() {
   // Initilize Sensor (Input) Pins
   for(int i = 0; i < NUM_INPUTS; i++) { pinMode(inputPins[i], INPUT_PULLUP); }
@@ -90,11 +106,17 @@ void setup() {
   FastLED.addLeds<NEOPIXEL, LED_PIN_1>(ledStrips[1], ledCount[1]);
   FastLED.addLeds<NEOPIXEL, LED_PIN_2>(ledStrips[2], ledCount[2]);
   FastLED.addLeds<NEOPIXEL, LED_PIN_3>(ledStrips[3], ledCount[3]);
+
+  // Serial Debugging
   Serial.begin(115200);
 
   // Setup animations
   setupAnimation(7, 255, .25);
   setupAnimation(9, 255, .25);
+
+  // Setup ADS (for current sensor)
+  ads.setGain(GAIN_FOUR);      // +/- 1.024V 1bit = 0.5mV
+  ads.begin();
 }
 
 char* curVal = "";
@@ -126,6 +148,12 @@ void loop() {
 
   // "Asyncronously" run animations, 1 "step" per loop
   runAnimations();
+
+  // Get Current AC Draw
+  float currentACDraw = readCurrent();
+
+  // Read Main Tank
+  int mainWaterPercent = readMainWater();
 }
 
 // Method to setup animations
@@ -149,4 +177,32 @@ void runAnimations() {
       dimmerAnimations[i][CURRENT_BRIGHTNESS] = newBrightness;
     }
   }
+}
+
+// Method to read the Current Sensor and get current AC Draw
+float readCurrent() {
+  float voltage;
+  float current;
+  float sum = 0;
+  long time_check = millis();
+  int counter = 0;
+
+  while (millis() - time_check < 1000) {
+    voltage = ads.readADC_Differential_0_1() * CS_MULTIPLIER;
+    current = voltage * CS_FACTOR;
+    //current /= 1000.0;
+
+    sum += sq(current);
+    counter = counter + 1;
+  }
+
+  current = sqrt(sum / counter);
+  return (current);
+}
+
+// Method to read the current percentage of water in the tank
+float readMainWater() {
+  int temp = analogRead(analogPins[0]);
+
+  return temp / 1024.0
 }
