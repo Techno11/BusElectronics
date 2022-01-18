@@ -93,6 +93,7 @@ float dimmerAnimations[NUM_DIMMERS][3] = {
 Adafruit_ADS1115 ads;
 const float CS_FACTOR = 100; //100A/1V from the CT
 const float CS_MULTIPLIER = 0.00005;
+float currentCurrent = 0.0;
 
 void setup() {
   // Initilize Sensor (Input) Pins
@@ -150,7 +151,7 @@ void loop() {
   runAnimations();
 
   // Get Current AC Draw
-  float currentACDraw = readCurrent();
+  readCurrent();
 
   // Read Main Tank
   int mainWaterPercent = readMainWater();
@@ -179,30 +180,34 @@ void runAnimations() {
   }
 }
 
+
+float sum = 0;
+long time_check = millis();
+int counter = 0;
+
 // Method to read the Current Sensor and get current AC Draw
 float readCurrent() {
   float voltage;
   float current;
-  float sum = 0;
-  long time_check = millis();
-  int counter = 0;
 
-  while (millis() - time_check < 1000) {
+  if (millis() - time_check < 1000) {
     voltage = ads.readADC_Differential_0_1() * CS_MULTIPLIER;
     current = voltage * CS_FACTOR;
-    //current /= 1000.0;
+    // current /= 1000.0;
 
     sum += sq(current);
     counter = counter + 1;
+  } else {
+    currentCurrent = sqrt(sum / counter);
+    sum = 0;
+    time_check = millis();
+    counter = 0;
   }
-
-  current = sqrt(sum / counter);
-  return (current);
 }
 
 // Method to read the current percentage of water in the tank
 float readMainWater() {
   int temp = analogRead(analogPins[0]);
 
-  return temp / 1024.0
+  return temp / 1024.0;
 }
