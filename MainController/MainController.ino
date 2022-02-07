@@ -63,10 +63,10 @@ const int analogPins[NUM_ANALOG] = {15};
 #define LED_PIN_1 45
 #define LED_PIN_2 46
 #define LED_PIN_3 47
-#define NUM_LEDS_0 60
-#define NUM_LEDS_1 60
-#define NUM_LEDS_2 60
-#define NUM_LEDS_3 60
+#define NUM_LEDS_0 120
+#define NUM_LEDS_1 120
+#define NUM_LEDS_2 120
+#define NUM_LEDS_3 120
 const int ledCount[NUM_LED_STRIPS] = {NUM_LEDS_0, NUM_LEDS_1, NUM_LEDS_2, NUM_LEDS_3};
 CRGB ledStrips[][NUM_LED_STRIPS] = {new CRGB[NUM_LEDS_0], new CRGB[NUM_LEDS_1], new CRGB[NUM_LEDS_2], new CRGB[NUM_LEDS_3]};
 
