@@ -29,8 +29,8 @@
  * 06 => 32 - [Relay 7]
  * 07 => 33 - [Relay 8]
  ****** LED Strips ******
- * 00 => 44 - "Bedroom" LEDs
- * 01 => 45 - 
+ * 00 => 44 - "Bedroom" LEDs Passenger and Rear
+ * 01 => 45 - "Bedroom" LEDs Driver
  * 02 => 46 - 
  * 03 => 47 - 
  ****** Digital Inputs ******
@@ -47,14 +47,42 @@
  * 00 => 15 - Main Water Tank Sensor
  */
 
+/* How often to send status packets */
+#define SEND_STAUS_EVERY_MILLISECONDS 2000
+
+/* Dimmer Shorthand */
+#define SHOWER_DIMMER 4
+#define CLOSET_DIMMER 5
+#define ENTRY_DIMMER 6
+#define FRONT_AISLE_DIMMER 7
+#define SHOE_BOX_DIMMER 8
+#define REAR_AISLE_DIMMER 9
+
+/* Dimmer Pin-Map */
 #define NUM_DIMMERS 10
-#define NUM_INPUTS 8
-#define NUM_RELAYS 8
-#define NUM_ANALOG 1
-const int inputPins[NUM_INPUTS] = {14, 15, 16, 17, 18, 19, 20, 21};
 const int dimmerPins[NUM_DIMMERS] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+
+/* Relay Shorthand */
+#define WATER_PUMP_RELAY 0
+#define PROPANE_VALVE_RELAY 1
+
+/* Relay Pin-Map */
+#define NUM_RELAYS 8
 const int relayPins[NUM_RELAYS] = {26, 27, 28, 29, 30, 31, 32, 33};
+
+/* Analog Shorthand */ 
+#define MAIN_WATER_TANK_INPUT 0
+
+/* Analog Pin-Map */
+#define NUM_ANALOG 1
 const int analogPins[NUM_ANALOG] = {15};
+
+/* Digital Inputs */
+#define SHOWER_BUTTON 0
+#define CLOSET_DOOR_SWITCHES 1
+
+#define NUM_INPUTS 8
+const int inputPins[NUM_INPUTS] = {14, 15, 16, 17, 18, 19, 20, 21};
 
 
 // LED Config
@@ -93,7 +121,6 @@ float dimmerAnimations[NUM_DIMMERS][3] = {
 Adafruit_ADS1115 ads;
 const float CS_FACTOR = 100; //100A/1V from the CT
 const float CS_MULTIPLIER = 0.00005;
-float currentCurrent = 0.0;
 
 void setup() {
   // Initilize Sensor (Input) Pins
@@ -111,20 +138,25 @@ void setup() {
   // Serial Debugging
   Serial.begin(115200);
 
+  // Communication to pi
+  Serial1.begin(115200);
+
   // Setup animations
-  setupAnimation(7, 255, .25);
-  setupAnimation(9, 255, .25);
+  setupAnimation(FRONT_AISLE_DIMMER, 255, .25);
+  setupAnimation(REAR_AISLE_DIMMER, 255, .25);
 
   // Setup ADS (for current sensor)
   ads.setGain(GAIN_FOUR);      // +/- 1.024V 1bit = 0.5mV
   ads.begin();
 }
 
-char* curVal = "";
+// Sensor States
+float currentCurrent = 0.0;
+float currentWaterPercent = 0.0;
 int lastButtonReads[] = {1, 1, 1, 1, 1, 1, 1, 1};
 
-// State Variables
-int bathroomLightState = 0;
+// Track status updates
+long lastStatusSent = -2000;
 
 void loop() {
   for(int i = 0; i < NUM_INPUTS; i++) {
@@ -134,9 +166,8 @@ void loop() {
         // TODO: Handle Button Presses
 
         /* Bathroom Button Pressed  */
-        if(i == 0) {
-          bathroomLightState = 255;
-          analogWrite(dimmerPins[4], bathroomLightState);
+        if(i == SHOWER_BUTTON) {
+          setupAnimation(SHOWER_DIMMER, 255, .25);
         }
       }
   }
@@ -154,7 +185,23 @@ void loop() {
   readCurrent();
 
   // Read Main Tank
-  int mainWaterPercent = readMainWater();
+  readMainWater();
+
+  // If it's been the configured time since the last status message was sent, send another
+  if(millis() - lastStatusSent > SEND_STAUS_EVERY_MILLISECONDS){
+    sendStatus();
+    lastStatusSent = millis();
+  }
+}
+
+void sendStatus() {
+  String out =
+  "{\"water_percent\":" + String(currentWaterPercent) + "," +
+  "\"current\":" + currentCurrent + "," +
+  "\"digital_inputs\":[" + lastButtonReads[0] + "," + lastButtonReads[1] + "," + lastButtonReads[2] + "," + lastButtonReads[3] + "," + lastButtonReads[4] + "," + lastButtonReads[5] + "," + lastButtonReads[6] + "," + lastButtonReads[7] + "]," +
+  "\"dimmers\":[" + dimmerAnimations[0][0] + "," + dimmerAnimations[1][0] + "," + dimmerAnimations[2][0] + "," + dimmerAnimations[3][0] + "," + dimmerAnimations[4][0] + "," + dimmerAnimations[5][0] + "," + dimmerAnimations[6][0] + "," + dimmerAnimations[7][0] + "," + dimmerAnimations[8][0] + "," + dimmerAnimations[9][0] + "]" +
+  "}";
+  Serial1.println(out);
 }
 
 // Method to setup animations
@@ -186,7 +233,7 @@ long time_check = millis();
 int counter = 0;
 
 // Method to read the Current Sensor and get current AC Draw
-float readCurrent() {
+void readCurrent() {
   float voltage;
   float current;
 
@@ -207,7 +254,6 @@ float readCurrent() {
 
 // Method to read the current percentage of water in the tank
 float readMainWater() {
-  int temp = analogRead(analogPins[0]);
-
-  return temp / 1024.0;
+  int raw = analogRead(analogPins[0]);
+  currentWaterPercent = raw / 1024.0;
 }

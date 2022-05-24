@@ -4,7 +4,8 @@
   "description": "Backend for the Bus GUI project",
   "main": "build/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsc && node build/index.js"
   },
   "author": "Soren Zaiser",
   "license": "ISC",
@@ -14,11 +15,13 @@
     "express": "^4.17.2",
     "helmet": "^5.0.2",
     "serialport": "^9.2.8",
-    "socket.io": "^4.4.1"
+    "socket.io": "^4.4.1",
+    "typescript": "^4.6.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.12",
     "@types/express": "^4.17.13",
+    "@types/node": "^17.0.35",
     "@types/serialport": "^8.0.2"
   }
 }
