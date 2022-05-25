@@ -6,11 +6,13 @@
     "@babel/helper-builder-react-jsx": "latest",
     "@emotion/react": "latest",
     "@emotion/styled": "latest",
+    "@mui/icons-material": "^5.8.0",
     "@mui/material": "latest",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",
     "preact": "latest",
+    "react-color": "^2.19.3",
     "react-scripts": "^3.4.3",
     "typescript": "^4.6.4"
   },
@@ -34,6 +36,7 @@
   },
   "devDependencies": {
     "@types/node": "^17.0.35",
+    "@types/react-color": "^3.0.6",
     "customize-cra": "latest",
     "react-app-rewired": "latest"
   }
