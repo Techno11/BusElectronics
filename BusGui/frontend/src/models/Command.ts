@@ -1,11 +1,12 @@
 import LEDColor from "./LEDColor";
 import Mosfet from "./Mosfet";
 
-type Command = ColorCommand | IntensityCommand | OnOffCommand;
+type Command = ColorCommand | IntensityCommand;
 
 type CommandBase = {
   fixture: Fixture
   device: Device
+  on: boolean
 }
 
 type ColorCommand = {
@@ -18,10 +19,6 @@ type ColorCommand = {
 type IntensityCommand = {
   type: CommandType.Intensity
   intensity: number
-} & CommandBase
-
-type OnOffCommand = {
-  type: CommandType.On | CommandType.Off
 } & CommandBase
 
 type Fixture = MosfetFixtures | RelayFixtures | LEDFixtures | DigitalFixtures | AnalogFixtures;
@@ -51,10 +48,11 @@ enum RelayFixtures {
 }
 
 enum LEDFixtures {
-  BedroomPassRear,
+  BedroomPassenger,
   BedroomDriver,
   LED2,
   LED3,
+  BedroomRear
 }
 
 enum DigitalFixtures {
@@ -83,8 +81,6 @@ enum Device {
 enum CommandType {
   Intensity,
   Color,
-  On,
-  Off
 }
 
 const getName = (device: Device, fixture: Fixture) => {
@@ -106,7 +102,8 @@ const getName = (device: Device, fixture: Fixture) => {
     case Device.LED:
       switch(fixture){
         case LEDFixtures.BedroomDriver: return "Bedroom Front Driver"
-        case LEDFixtures.BedroomPassRear: return "Bedroom Passenger/Rear"
+        case LEDFixtures.BedroomPassenger: return "Bedroom Front Passenger"
+        case LEDFixtures.BedroomRear: return "Bedroom Rear"
         case LEDFixtures.LED2: return "LED 2"
         case LEDFixtures.LED3: return "LED 3"
       }
@@ -149,6 +146,7 @@ const makeLedCommand = (device: Device, fixture: Fixture, state: LEDColor): Comm
     type: CommandType.Color,
     device,
     fixture,
+    on: state.on,
     red: Math.ceil(state.r * state.a),
     green: Math.ceil(state.g * state.a),
     blue: Math.ceil(state.b * state.a),
@@ -160,15 +158,8 @@ const makeMosfetCommand = (device: Device, fixture: Fixture, state: Mosfet): Com
     type: CommandType.Intensity,
     device,
     fixture,
+    on: state.on,
     intensity: Math.ceil(state.i * 255)
-  }
-}
-
-const makeToggleCommand = (device: Device, fixture: Fixture, state: Mosfet | LEDColor): Command => {
-  return {
-    type: state.on ? CommandType.On : CommandType.Off,
-    device,
-    fixture
   }
 }
 
@@ -181,7 +172,6 @@ export {
   MosfetFixtures,
   makeLedCommand,
   makeMosfetCommand,
-  makeToggleCommand,
   getName,
 }
 export default Command;

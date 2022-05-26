@@ -23,7 +23,7 @@ export default class BusSocket {
   public runCommand(command: Command): Promise<boolean> {
     return new Promise(resolve => {
       if(Date.now() - this._lastReq >  rateLimit) {
-        this._socket.on("go-response", json => {
+        this._socket.on("control-response", json => {
           resolve(json.success)
         })
         this._socket.emit("control", command);

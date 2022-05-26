@@ -8,7 +8,6 @@ import {
   LEDFixtures,
   makeLedCommand,
   makeMosfetCommand,
-  makeToggleCommand,
   MosfetFixtures
 } from "../models/Command";
 import {AlphaPicker, ColorResult, HuePicker} from "react-color"
@@ -37,7 +36,7 @@ const LightControl = ({goBack}: IProps) => {
 
   // State
   const [mosfets, setMosfets] = useState<Mosfet[]>([newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), ]);
-  const [leds, setLeds] = useState<LEDColor[]>([newLED(), newLED(), newLED(), newLED()]);
+  const [leds, setLeds] = useState<LEDColor[]>([newLED(), newLED(), newLED(), newLED(), newLED()]);
   const [currentFixture, setCurrentFixture] = useState<MosfetFixtures | LEDFixtures>(MosfetFixtures.RearAisle);
   const [currentDevice, setCurrentDevice] = useState<Device.LED | Device.MOSFET>(Device.MOSFET);
 
@@ -62,8 +61,8 @@ const LightControl = ({goBack}: IProps) => {
   }
 
   // Bedroom
-  const selBedroomRear = () => selectLed(LEDFixtures.BedroomPassRear);
-  const selBedroomPass = () => selectLed(LEDFixtures.BedroomPassRear);
+  const selBedroomRear = () => selectLed(LEDFixtures.BedroomRear);
+  const selBedroomPass = () => selectLed(LEDFixtures.BedroomPassenger);
   const selBedroomDriver = () => selectLed(LEDFixtures.BedroomDriver);
 
   // Rear Aisle Stack
@@ -95,7 +94,7 @@ const LightControl = ({goBack}: IProps) => {
     const copy = [...mosfets];
     copy[selFix].on = !val;
     setMosfets(copy);
-    bus.runCommand(makeToggleCommand(currentDevice, selFix, copy[selFix]));
+    bus.runCommand(makeMosfetCommand(currentDevice, selFix, copy[selFix]));
   }
 
   // Update LED Fixture
@@ -111,7 +110,7 @@ const LightControl = ({goBack}: IProps) => {
     const copy = [...leds];
     copy[selFix].on = !val;
     setLeds(copy)
-    bus.runCommand(makeToggleCommand(currentDevice, selFix, copy[selFix]));
+    bus.runCommand(makeLedCommand(currentDevice, selFix, copy[selFix]));
   }
 
   const calcOpacity = (fixture: MosfetFixtures | LEDFixtures): number => {
@@ -132,7 +131,7 @@ const LightControl = ({goBack}: IProps) => {
               borderRight: "none",
               height: 1,
               width: bedroomHalfWidth,
-              background: getRGBA(leds[LEDFixtures.BedroomPassRear])
+              background: getRGBA(leds[LEDFixtures.BedroomRear])
             }}
             onClick={selBedroomRear}
           />
@@ -141,7 +140,7 @@ const LightControl = ({goBack}: IProps) => {
         {/* Bedroom Area Front */}
         <Grid item>
           <Box sx={{borderTop: border, height: .5, width: bedroomHalfWidth, background: getRGBA(leds[LEDFixtures.BedroomDriver])}} onClick={selBedroomDriver} />
-          <Box sx={{borderBottom: border, height: .5, width: bedroomHalfWidth, background: getRGBA(leds[LEDFixtures.BedroomPassRear])}} onClick={selBedroomPass} />
+          <Box sx={{borderBottom: border, height: .5, width: bedroomHalfWidth, background: getRGBA(leds[LEDFixtures.BedroomPassenger])}} onClick={selBedroomPass} />
         </Grid>
 
         {/* Rear Hallway/Closet/Bathroom */}

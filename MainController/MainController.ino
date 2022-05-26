@@ -95,6 +95,8 @@ const int inputPins[NUM_INPUTS] = {14, 15, 16, 17, 18, 19, 20, 21};
 #define NUM_LEDS_1 120
 #define NUM_LEDS_2 120
 #define NUM_LEDS_3 120
+#define NUM_LEDS_0_PASS 60
+#define NUM_LEDS_0_REAR 60
 const int ledCount[NUM_LED_STRIPS] = {NUM_LEDS_0, NUM_LEDS_1, NUM_LEDS_2, NUM_LEDS_3};
 CRGB ledStrips[][NUM_LED_STRIPS] = {new CRGB[NUM_LEDS_0], new CRGB[NUM_LEDS_1], new CRGB[NUM_LEDS_2], new CRGB[NUM_LEDS_3]};
 
@@ -139,7 +141,7 @@ void setup() {
   Serial.begin(115200);
 
   // Communication to pi
-  Serial1.begin(115200);
+  // Serial1.begin(115200);
 
   // Setup animations
   setupAnimation(FRONT_AISLE_DIMMER, 255, .25);
@@ -156,7 +158,7 @@ float currentWaterPercent = 0.0;
 int lastButtonReads[] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 // Track status updates
-long lastStatusSent = -2000;
+long lastStatusSent = 0;
 
 void loop() {
   for(int i = 0; i < NUM_INPUTS; i++) {
@@ -176,6 +178,8 @@ void loop() {
       ledStrips[i][j] = CRGB::White;
     }
   }
+
+  // Run LEDs
   FastLED.show(); 
 
   // "Asyncronously" run animations, 1 "step" per loop
@@ -187,21 +191,115 @@ void loop() {
   // Read Main Tank
   readMainWater();
 
+  // Serial Read
+  doSerial();
+
   // If it's been the configured time since the last status message was sent, send another
   if(millis() - lastStatusSent > SEND_STAUS_EVERY_MILLISECONDS){
-    sendStatus();
+    // sendStatus();
     lastStatusSent = millis();
   }
 }
 
+/* Serial bits for a "command" are in this order:
+* 0 - Command Type (0 = Intensity, 1 = Color)
+* 1 - Device (0 = Mosfet, 1 = Relay, 2 = LED, 3 = Digital, 4 = Analog)
+* 2 - Fixture
+* 3 - 0 = Off, 1 = On
+* 4 - Data 1 (Intensity, Red)
+* 5 - Data 2 (Green)
+* 6 - Data 3 (Blue)
+* ...
+ */
+void doSerial() {
+  while (Serial.available() > 0){
+    // Create a place to hold the incoming command
+    static int command[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    static unsigned int commandPos = 0; 
+
+    // Read the next available byte in the serial receive buffer
+    char inByte = Serial.read();
+
+    // Message coming in (check not terminating character) and guard for over message size
+    if ( inByte != '\n' && (commandPos < 8) ){
+      
+      // Add the incoming byte to our command
+      command[commandPos] = inByte;
+      commandPos++;
+    } else {
+      // Start processing command
+      if(command[0] == 0) {           // "Intensity" Command
+        // Command desired fixture to go to desired intensity immediately
+        setupAnimation(command[2], command[4], 255);
+      } else if (command[0] == 1) {   // "Color" Command
+        processLeds(command[2], command[4], command[5], command[6]);
+      }
+
+      //Reset for the next message
+      commandPos = 0;
+    }
+  }
+}
+
+void processLeds(int fixture, int red, int green, int blue) {
+  if(fixture > 1 && fixture < 4) {
+    for(int i = 0; i < ledCount[fixture]; i++) {
+      ledStrips[fixture][i] = CRGB(red, green, blue);
+    }
+  } else if(fixture == 0) { // First n leds are for passenger
+    for(int i = 0; i < NUM_LEDS_0_PASS; i++) {
+      ledStrips[0][i] = CRGB(red, green, blue);
+    }
+  } else if(fixture == 4) { // Second n leds are for rear
+    for(int i = NUM_LEDS_0_PASS; i < NUM_LEDS_0_PASS + NUM_LEDS_0_REAR; i++) {
+      ledStrips[0][i] = CRGB(red, green, blue);
+    }
+  }
+}
+
 void sendStatus() {
-  String out =
-  "{\"water_percent\":" + String(currentWaterPercent) + "," +
-  "\"current\":" + currentCurrent + "," +
-  "\"digital_inputs\":[" + lastButtonReads[0] + "," + lastButtonReads[1] + "," + lastButtonReads[2] + "," + lastButtonReads[3] + "," + lastButtonReads[4] + "," + lastButtonReads[5] + "," + lastButtonReads[6] + "," + lastButtonReads[7] + "]," +
-  "\"dimmers\":[" + dimmerAnimations[0][0] + "," + dimmerAnimations[1][0] + "," + dimmerAnimations[2][0] + "," + dimmerAnimations[3][0] + "," + dimmerAnimations[4][0] + "," + dimmerAnimations[5][0] + "," + dimmerAnimations[6][0] + "," + dimmerAnimations[7][0] + "," + dimmerAnimations[8][0] + "," + dimmerAnimations[9][0] + "]" +
-  "}";
-  Serial1.println(out);
+  Serial.print("{\"water_percent\":");
+  Serial.print(currentWaterPercent);
+  Serial.print(",\"current\":");
+  Serial.print(currentCurrent);
+  Serial.print(",\"digital_inputs\":[");
+  Serial.print(lastButtonReads[0]);
+  Serial.print(",");
+  Serial.print(lastButtonReads[1]);
+  Serial.print(",");
+  Serial.print(lastButtonReads[2]);
+  Serial.print(",");
+  Serial.print(lastButtonReads[3]);
+  Serial.print(",");
+  Serial.print(lastButtonReads[4]);
+  Serial.print(",");
+  Serial.print(lastButtonReads[5]);
+  Serial.print(",");
+  Serial.print(lastButtonReads[6]);
+  Serial.print(",");
+  Serial.print(lastButtonReads[7]);
+  Serial.print("],\"dimmers\":[");
+  Serial.print(dimmerAnimations[0][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[1][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[2][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[3][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[4][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[5][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[6][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[7][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[8][CURRENT_BRIGHTNESS]);
+  Serial.print(",");
+  Serial.print(dimmerAnimations[9][CURRENT_BRIGHTNESS]);
+  Serial.print("]}");
+  Serial.print("\n"); // Tells Pi that we're done
 }
 
 // Method to setup animations
@@ -217,12 +315,24 @@ void setupAnimation(int i, int desired, float animationSpeed) {
 
 // Method to handle active animations
 void runAnimations() {
+  int delta = 0;
   for(int i = 0; i < NUM_DIMMERS; i++){
+    // Continue if desired equals current
+    if(dimmerAnimations[i][CURRENT_BRIGHTNESS] == dimmerAnimations[i][DESIRED_BRIGHTNESS]) continue;
+    
+    // Calculate Delta
+    delta = abs(dimmerAnimations[i][CURRENT_BRIGHTNESS] - dimmerAnimations[i][DESIRED_BRIGHTNESS]);
+    
     // If the difference of the current and the desired is more than 1 step away
-    if(abs(dimmerAnimations[i][CURRENT_BRIGHTNESS] - dimmerAnimations[i][DESIRED_BRIGHTNESS]) >= dimmerAnimations[i][ANIMATION_STEPS]) {
+    if(delta >= dimmerAnimations[i][ANIMATION_STEPS]) {
       float newBrightness = dimmerAnimations[i][CURRENT_BRIGHTNESS] + dimmerAnimations[i][ANIMATION_STEPS];
       analogWrite(dimmerPins[i], (int)newBrightness);
       dimmerAnimations[i][CURRENT_BRIGHTNESS] = newBrightness;
+    
+    // If delta is less than a step, just go there
+    } else if (delta < dimmerAnimations[i][ANIMATION_STEPS]) {
+      analogWrite(dimmerPins[i], dimmerAnimations[i][DESIRED_BRIGHTNESS]);
+      dimmerAnimations[i][CURRENT_BRIGHTNESS] = dimmerAnimations[i][DESIRED_BRIGHTNESS];
     }
   }
 }

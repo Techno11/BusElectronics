@@ -16,6 +16,9 @@ class Arduino {
   private port: string;
   private baud: number;
 
+  // Serial "Buffer"
+  private buffer: Buffer = Buffer.from("");
+
   // Heartbeat information
   private heartbeatTimeout: NodeJS.Timeout;
   private healthy: boolean = false;
@@ -91,9 +94,24 @@ class Arduino {
    * @private
    */
   private onData(data: Buffer) {
+    // If we get a newline (\n)
+    if(data.indexOf(0x0d) > -1) {
+      this.dataDone();
+    } else {
+      this.buffer = Buffer.concat([this.buffer, data]);
+    }
+  }
+
+  /**
+   * Called when the \n character is recieved, marking end of a message
+   * @private
+   */
+  private dataDone() {
     try {
       // Messages from arduino are sent in json
-      const parsed = JSON.parse(data.toString('utf8'));
+      const parsed = JSON.parse(this.buffer.toString('utf8').trim());
+      // Reset Buffer
+      this.buffer = Buffer.from("");
       // Handle heartbeat
       this.handleHeartbeat();
       // Create message
@@ -101,10 +119,17 @@ class Arduino {
       // Emit to our listeners
       this.emitToListeners(msg);
     } catch (err) {
-      console.log(`Invalid message from arduino: \n"${data.toString('utf8')}"`);
+      // Print invalid message
+      console.log(`Invalid message from arduino: \n"${this.buffer.toString('utf8')}"`, err);
+      // Reset Buffer
+      this.buffer = Buffer.from("");
     }
   }
 
+  /**
+   * Send a command to be executed
+   * @param command
+   */
   public sendCommand(command: Command): boolean {
     if(!validateCommand(command)) return false;
     this.serial.write(formatCommand(command));

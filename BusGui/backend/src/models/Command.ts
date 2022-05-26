@@ -1,10 +1,11 @@
 import {type} from "os";
 
-type Command = ColorCommand | IntensityCommand | OnOffCommand;
+type Command = ColorCommand | IntensityCommand;
 
 type CommandBase = {
   fixture: Fixture
   device: Device
+  on: boolean
 }
 
 type ColorCommand = {
@@ -17,10 +18,6 @@ type ColorCommand = {
 type IntensityCommand = {
   type: CommandType.Intensity
   intensity: number
-} & CommandBase
-
-type OnOffCommand = {
-  type: CommandType.On | CommandType.Off
 } & CommandBase
 
 type Fixture = MosfetFixtures | RelayFixtures | LEDFixtures | DigitalFixtures | AnalogFixtures;
@@ -51,10 +48,11 @@ enum RelayFixtures {
 }
 
 enum LEDFixtures {
-  BedroomPassRear,
+  BedroomPassenger,
   BedroomDriver,
   LED2,
   LED3,
+  BedroomRear
 }
 
 enum DigitalFixtures {
@@ -82,9 +80,7 @@ enum Device {
 
 enum CommandType {
   Intensity,
-  Color,
-  On,
-  Off
+  Color
 }
 
 /**
@@ -111,8 +107,6 @@ const validateCommand = (data: Command) => {
       typeof data.intensity === "number" &&
       data.intensity >= 0 && data.intensity <= 255
     )
-  } else if (data.type === CommandType.On || data.type === CommandType.Off) {
-    return true
   } else {
     return false;
   }
@@ -126,19 +120,15 @@ const validateCommand = (data: Command) => {
  *
  * @param command Command to send
  */
-const formatCommand = (command: Command): string => {
+const formatCommand = (command: Command): number[] => {
   // Command string base
-  let commandString = `${command.type} ${command.device} ${command.fixture}`;
+  let commandArr = [command.type, command.device, command.fixture, command.on ? 1 : 0];
   if(command.type === CommandType.Intensity) {
-    commandString += ` 1 ${command.intensity}`;
+    commandArr.push(command.intensity);
   } else if (command.type === CommandType.Color) {
-    commandString += ` 1 ${command.red} ${command.green} ${command.blue}`
-  } else if (command.type === CommandType.On) {
-    commandString += ` 1`;
-  } else if (command.type === CommandType.Off) {
-    commandString += ` 0`;
+    commandArr.push(command.red, command.green, command.blue);
   }
-  return commandString;
+  return commandArr;
 }
 
 export {validateCommand, formatCommand};
