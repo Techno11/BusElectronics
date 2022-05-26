@@ -1,3 +1,6 @@
+import LEDColor from "./LEDColor";
+import Mosfet from "./Mosfet";
+
 type Command = ColorCommand | IntensityCommand | OnOffCommand;
 
 type CommandBase = {
@@ -141,6 +144,34 @@ const getName = (device: Device, fixture: Fixture) => {
   return `Unknown Device: ${device}:${fixture}`;
 }
 
+const makeLedCommand = (device: Device, fixture: Fixture, state: LEDColor): Command => {
+  return {
+    type: CommandType.Color,
+    device,
+    fixture,
+    red: Math.ceil(state.r * state.a),
+    green: Math.ceil(state.g * state.a),
+    blue: Math.ceil(state.b * state.a),
+  }
+}
+
+const makeMosfetCommand = (device: Device, fixture: Fixture, state: Mosfet): Command => {
+  return {
+    type: CommandType.Intensity,
+    device,
+    fixture,
+    intensity: Math.ceil(state.i * 255)
+  }
+}
+
+const makeToggleCommand = (device: Device, fixture: Fixture, state: Mosfet | LEDColor): Command => {
+  return {
+    type: state.on ? CommandType.On : CommandType.Off,
+    device,
+    fixture
+  }
+}
+
 export {
   CommandType,
   Device,
@@ -148,6 +179,9 @@ export {
   DigitalFixtures,
   LEDFixtures,
   MosfetFixtures,
+  makeLedCommand,
+  makeMosfetCommand,
+  makeToggleCommand,
   getName,
 }
 export default Command;

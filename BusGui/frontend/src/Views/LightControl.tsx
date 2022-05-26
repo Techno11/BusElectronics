@@ -2,10 +2,20 @@ import React from "react";
 import {Box, Fab, Grid, Slider, Typography} from "@mui/material";
 import FadableLightIcon from "../components/FadableLightIcon";
 import {useState} from "preact/hooks";
-import {Device, getName, LEDFixtures, MosfetFixtures} from "../models/Command";
+import {
+  Device,
+  getName,
+  LEDFixtures,
+  makeLedCommand,
+  makeMosfetCommand,
+  makeToggleCommand,
+  MosfetFixtures
+} from "../models/Command";
 import {AlphaPicker, ColorResult, HuePicker} from "react-color"
 import LEDColor, {getNew as newLED, getRGBA} from "../models/LEDColor"
 import {ExitToApp} from "@mui/icons-material";
+import {useBus} from "../data/hooks/useSocket";
+import Mosfet, {getNew as newFet} from "../models/Mosfet";
 
 interface IProps {
   goBack: () => void,
@@ -22,19 +32,33 @@ const border = "solid 5px white";
 
 const LightControl = ({goBack}: IProps) => {
 
-  const [mosfets, setMosfets] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  // Hooks
+  const bus = useBus();
+
+  // State
+  const [mosfets, setMosfets] = useState<Mosfet[]>([newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), newFet(), ]);
   const [leds, setLeds] = useState<LEDColor[]>([newLED(), newLED(), newLED(), newLED()]);
   const [currentFixture, setCurrentFixture] = useState<MosfetFixtures | LEDFixtures>(MosfetFixtures.RearAisle);
   const [currentDevice, setCurrentDevice] = useState<Device.LED | Device.MOSFET>(Device.MOSFET);
 
   const selectLight = (fixture: MosfetFixtures) => {
-    setCurrentDevice(Device.MOSFET);
-    setCurrentFixture(fixture);
+    // Check if this fixture is already selected, if so, toggle it
+    if(currentDevice === Device.MOSFET && currentFixture === fixture) {
+      toggleMosfetFixture(mosfets[fixture].on, fixture);
+    } else {
+      setCurrentDevice(Device.MOSFET);
+      setCurrentFixture(fixture);
+    }
   }
 
   const selectLed = (fixture: LEDFixtures) => {
-    setCurrentDevice(Device.LED);
-    setCurrentFixture(fixture);
+    // Check if this fixture is already selected, if so, toggle it
+    if(currentDevice === Device.LED && currentFixture === fixture) {
+      toggleLeds(leds[fixture].on, fixture);
+    } else {
+      setCurrentDevice(Device.LED);
+      setCurrentFixture(fixture);
+    }
   }
 
   // Bedroom
@@ -60,14 +84,39 @@ const LightControl = ({goBack}: IProps) => {
   const updateMosfetFixture = (val: number | number[], selFix: MosfetFixtures | LEDFixtures) => {
     if(Array.isArray(val)) val = val[0];
     const copy = [...mosfets];
-    copy[selFix] = val;
+    copy[selFix].i = val;
+    copy[selFix].on = true;
     setMosfets(copy);
+    bus.runCommand(makeMosfetCommand(currentDevice, selFix, copy[selFix]));
   }
 
+  // Toggle Mosfet Fixture
+  const toggleMosfetFixture = (val: boolean, selFix: MosfetFixtures | LEDFixtures) => {
+    const copy = [...mosfets];
+    copy[selFix].on = !val;
+    setMosfets(copy);
+    bus.runCommand(makeToggleCommand(currentDevice, selFix, copy[selFix]));
+  }
+
+  // Update LED Fixture
   const updateLeds = (color: ColorResult, selFix: MosfetFixtures | LEDFixtures) => {
     const copy = [...leds];
-    copy[selFix] = color.rgb as LEDColor;
+    copy[selFix] = {...color.rgb, on: true} as LEDColor;
     setLeds(copy)
+    bus.runCommand(makeLedCommand(currentDevice, selFix, copy[selFix]));
+  }
+
+  // Update LED Fixture
+  const toggleLeds = (val: boolean, selFix: MosfetFixtures | LEDFixtures) => {
+    const copy = [...leds];
+    copy[selFix].on = !val;
+    setLeds(copy)
+    bus.runCommand(makeToggleCommand(currentDevice, selFix, copy[selFix]));
+  }
+
+  const calcOpacity = (fixture: MosfetFixtures | LEDFixtures): number => {
+    const f = mosfets[fixture];
+    return f.on ? f.i : 0;
   }
 
   return (
@@ -98,13 +147,13 @@ const LightControl = ({goBack}: IProps) => {
         {/* Rear Hallway/Closet/Bathroom */}
         <Grid item>
           <Box sx={{border: border, borderRadius: `0 0 ${radius} ${radius}`, height: 1/3, width: rearAisleWidth}} onClick={selShower}>
-            <FadableLightIcon size={"large"} opacity={mosfets[MosfetFixtures.ShowerLight]} />
+            <FadableLightIcon size={"large"} fixture={mosfets[MosfetFixtures.ShowerLight]} />
           </Box>
           <Box sx={{height: 1/3, width: rearAisleWidth}} onClick={selRearAisle}>
-            <FadableLightIcon size={"large"} opacity={mosfets[MosfetFixtures.RearAisle]} />
+            <FadableLightIcon size={"large"} fixture={mosfets[MosfetFixtures.RearAisle]} />
           </Box>
           <Box sx={{border: border, borderRadius: `${radius} ${radius} 0 0`, height: 1/3, width: rearAisleWidth}} onClick={selCloset}>
-            <FadableLightIcon size={"large"} opacity={mosfets[MosfetFixtures.ClosetLight]} />
+            <FadableLightIcon size={"large"} fixture={mosfets[MosfetFixtures.ClosetLight]} />
           </Box>
         </Grid>
 
@@ -120,7 +169,7 @@ const LightControl = ({goBack}: IProps) => {
             <Box sx={{width: 1/3, height: 1}} onClick={selRearAisle}/>
             {/* Head of Front Aisle*/}
             <Box sx={{width: 2/3, height: 1}} onClick={selFrontAisle}>
-              <FadableLightIcon size={"large"} opacity={mosfets[MosfetFixtures.FrontAisle]} />
+              <FadableLightIcon size={"large"} fixture={mosfets[MosfetFixtures.FrontAisle]} />
             </Box>
           </Box>
           {/* Spacer */}
@@ -129,7 +178,7 @@ const LightControl = ({goBack}: IProps) => {
             <Box sx={{width: 3/4, height: 1}} />
             {/* Top of Shoebox */}
             <Box sx={{width: 1/4, height: 1}} onClick={selShoebox}>
-              <FadableLightIcon size={"large"} opacity={mosfets[MosfetFixtures.ShoeBox]} />
+              <FadableLightIcon size={"large"} fixture={mosfets[MosfetFixtures.ShoeBox]} />
             </Box>
           </Box>
           {/* Passenger Windowsill */}
@@ -149,7 +198,7 @@ const LightControl = ({goBack}: IProps) => {
           <Box sx={{borderRight: border, height: 1/3, width: frontEntryWidth}} onClick={selFrontAisle}/>
           {/* Entry Light */}
           <Box sx={{borderBottom: border, borderRight: border, borderRadius: `0 0 ${radius} 0`, height: 1/3, width: frontEntryWidth}} onClick={selEntry}>
-            <FadableLightIcon size={"large"} opacity={mosfets[MosfetFixtures.EntryLight]} />
+            <FadableLightIcon size={"large"} fixture={mosfets[MosfetFixtures.EntryLight]} />
           </Box>
         </Grid>
       </Grid>
@@ -158,7 +207,15 @@ const LightControl = ({goBack}: IProps) => {
       <Box sx={{m: 2, textAlign: "center"}}>
         <Typography variant={"h5"}>{getName(currentDevice, currentFixture)}</Typography>
         {currentDevice === Device.MOSFET &&
-          <Slider onChange={(e, v) => updateMosfetFixture(v, currentFixture)} min={0} max={1} step={0.01} value={mosfets[currentFixture]} />
+          <>
+            <Slider
+              onChange={(e, v) => updateMosfetFixture(v, currentFixture)}
+              min={0}
+              max={1}
+              step={0.01}
+              value={calcOpacity(currentFixture)}
+            />
+          </>
         }
         {currentDevice === Device.LED &&
           <>

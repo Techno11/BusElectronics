@@ -46,6 +46,9 @@ io.on('connection', async (client: Socket) => {
     if(typeof command === "string") command = JSON.parse(command);
     const resp = arduino.sendCommand(command);
     client.emit("control-response", {success: resp})
+    // Emit to rest of server that there has been an update
+    // TODO: Maybe??
+    // client.broadcast.emit("command-executed", command);
   })
 });
 

@@ -1,7 +1,11 @@
 import SerialPort from "serialport";
 import Command, {formatCommand, validateCommand} from "./models/Command";
+import SocketServerTransmitMessage, {SocketServerInfoMessage} from "./models/SocketServerTransmitMessage";
 
 const heartbeatExpected = process.env.EXPECT_HEARTBEAT_EVERY_SECONDS ? parseInt(process.env.EXPECT_HEARTBEAT_EVERY_SECONDS) : 10;
+
+type Listener = (payload: SocketServerTransmitMessage) => any;
+type ListenerPool = {[key: string]: Listener};
 /**
  * This class initializes a connection to our main bus arduino.
  */
@@ -18,7 +22,7 @@ class Arduino {
   private lastHeartbeat: Date | null = null;
 
   // Listener information
-  private listeners: {[key: string]: (data: string) => any} = {};
+  private listeners: ListenerPool = {};
 
   constructor() {
     // Initialize connection info
@@ -69,7 +73,7 @@ class Arduino {
    * @param name name of listener
    * @param callback callback function to register
    */
-  public registerListener(name: string, callback: (data: any) => any) {
+  public registerListener(name: string, callback: Listener) {
     this.listeners[name] = callback;
   }
 
@@ -92,8 +96,10 @@ class Arduino {
       const parsed = JSON.parse(data.toString('utf8'));
       // Handle heartbeat
       this.handleHeartbeat();
+      // Create message
+      const msg: SocketServerInfoMessage = {type: "info", data: parsed};
       // Emit to our listeners
-      this.emitToListeners(parsed);
+      this.emitToListeners(msg);
     } catch (err) {
       console.log(`Invalid message from arduino: \n"${data.toString('utf8')}"`);
     }
@@ -127,7 +133,7 @@ class Arduino {
    * @param data Data to emit
    * @private
    */
-  private emitToListeners(data: any) {
+  private emitToListeners(data: SocketServerTransmitMessage) {
     for (const key in this.listeners) {
       try{
         this.listeners[key](data);
