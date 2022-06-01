@@ -45,10 +45,18 @@
  * 
  ****** Analog Inputs ******
  * 00 => 15 - Main Water Tank Sensor
+ * 01 => 16 - Propane Tank 1
+ * 01 => 16 - Propane Tank 2
+ * 01 => 16 - Shore Water Pressure
+ * 01 => 16 - Water Flow Rate
  */
 
 /* How often to send status packets */
 #define SEND_STAUS_EVERY_MILLISECONDS 2000
+
+/* Water Flow is a Hall-Effect Sensor */
+#define WATER_FLOW_PIN 2
+#define FLOW_SENSOR_CALI_FACTOR 10
 
 /* Dimmer Shorthand */
 #define SHOWER_DIMMER 4
@@ -72,10 +80,13 @@ const int relayPins[NUM_RELAYS] = {26, 27, 28, 29, 30, 31, 32, 33};
 
 /* Analog Shorthand */ 
 #define MAIN_WATER_TANK_INPUT 0
+#define PROPANE_TANK_ONE 1
+#define PROPANE_TANK_TWO 2
+#define SHORE_WATER_PRESSURE 3
 
 /* Analog Pin-Map */
-#define NUM_ANALOG 1
-const int analogPins[NUM_ANALOG] = {15};
+#define NUM_ANALOG 4
+const int analogPins[NUM_ANALOG] = {15, 14, 13, 12};
 
 /* Digital Inputs */
 #define SHOWER_BUTTON 0
@@ -123,6 +134,10 @@ float dimmerAnimations[NUM_DIMMERS][3] = {
 Adafruit_ADS1115 ads;
 const float CS_FACTOR = 100; //100A/1V from the CT
 const float CS_MULTIPLIER = 0.00005;
+volatile int flowFrequency = 0;
+
+// Flow sensor variables
+unsigned long flowLoopTime = millis();
 
 void setup() {
   // Initilize Sensor (Input) Pins
@@ -143,6 +158,11 @@ void setup() {
   // Communication to pi
   // Serial1.begin(115200);
 
+  // Setup Flow Sensor Inturrupt
+  pinMode(WATER_FLOW_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(WATER_FLOW_PIN), measureFlow, RISING); 
+
+
   // Setup animations
   setupAnimation(FRONT_AISLE_DIMMER, 255, .25);
   setupAnimation(REAR_AISLE_DIMMER, 255, .25);
@@ -153,14 +173,53 @@ void setup() {
 }
 
 // Sensor States
-float currentCurrent = 0.0;
-float currentWaterPercent = 0.0;
+float currentCurrent = 0.0; // amps
+float currentWaterPercent = 0.0; // percent
+float currentPropanePressure[2] = {0.0, 0.0}; // psi
+float currentWaterPressure = 0.0; // psi
+float currentWaterFlow = 0.0; // gallons per minute
 int lastButtonReads[] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 // Track status updates
 long lastStatusSent = 0;
 
 void loop() {
+  // Process digital inputs
+  readDIO();
+
+  // Get Current AC Draw
+  readCurrent();
+
+  // Read Main Tank
+  readMainWater();
+
+  // Read shore water pressure
+  readShoreWaterPressure();
+
+  // Read propane pressures
+  readPropane();
+
+  // Process the flow sensor data
+  processFlow();
+
+  // Run LEDs
+  FastLED.show(); 
+
+  // "Asyncronously" run animations, 1 "step" per loop
+  runAnimations();
+
+  // Serial Read
+  doSerial();
+
+  // If it's been the configured time since the last status message was sent, send another
+  if(millis() - lastStatusSent > SEND_STAUS_EVERY_MILLISECONDS){
+    // sendStatus();
+    lastStatusSent = millis();
+  }
+}
+
+// Read DIO pins
+void readDIO() {
   for(int i = 0; i < NUM_INPUTS; i++) {
     int newRead = digitalRead(inputPins[i]);
       if (lastButtonReads[i] != newRead) {
@@ -178,27 +237,6 @@ void loop() {
       ledStrips[i][j] = CRGB::White;
     }
   }
-
-  // Run LEDs
-  FastLED.show(); 
-
-  // "Asyncronously" run animations, 1 "step" per loop
-  runAnimations();
-
-  // Get Current AC Draw
-  readCurrent();
-
-  // Read Main Tank
-  readMainWater();
-
-  // Serial Read
-  doSerial();
-
-  // If it's been the configured time since the last status message was sent, send another
-  if(millis() - lastStatusSent > SEND_STAUS_EVERY_MILLISECONDS){
-    // sendStatus();
-    lastStatusSent = millis();
-  }
 }
 
 /* Serial bits for a "command" are in this order:
@@ -214,14 +252,14 @@ void loop() {
 void doSerial() {
   while (Serial.available() > 0){
     // Create a place to hold the incoming command
-    static int command[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    static int command[6] = {0, 0, 0, 0, 0, 0};
     static unsigned int commandPos = 0; 
 
     // Read the next available byte in the serial receive buffer
     char inByte = Serial.read();
 
     // Message coming in (check not terminating character) and guard for over message size
-    if ( inByte != '\n' && (commandPos < 8) ){
+    if ( inByte != '\n' && (commandPos < 6) ){
       
       // Add the incoming byte to our command
       command[commandPos] = inByte;
@@ -257,11 +295,20 @@ void processLeds(int fixture, int red, int green, int blue) {
   }
 }
 
+// Pseudo-json
 void sendStatus() {
   Serial.print("{\"water_percent\":");
   Serial.print(currentWaterPercent);
   Serial.print(",\"current\":");
   Serial.print(currentCurrent);
+  Serial.print(",\"propane_0\":");
+  Serial.print(currentPropanePressure[0]);
+  Serial.print(",\"propane_1\":");
+  Serial.print(currentPropanePressure[1]);
+  Serial.print(",\"shore_water_pressure\":");
+  Serial.print(currentWaterPressure);
+  Serial.print(",\"water_flow\":");
+  Serial.print(currentWaterFlow);
   Serial.print(",\"digital_inputs\":[");
   Serial.print(lastButtonReads[0]);
   Serial.print(",");
@@ -362,8 +409,50 @@ void readCurrent() {
   }
 }
 
-// Method to read the current percentage of water in the tank
+// Method to read the current percentage of water in the tank. Measured as a percent of 1024
 float readMainWater() {
-  int raw = analogRead(analogPins[0]);
+  int raw = analogRead(analogPins[MAIN_WATER_TANK_INPUT]);
   currentWaterPercent = raw / 1024.0;
+}
+
+// Method to read the current propane PSI. 150psi == 1024
+float readPropane() {
+  int raw1 = analogRead(analogPins[PROPANE_TANK_ONE]);
+  int raw2 = analogRead(analogPins[PROPANE_TANK_TWO]);
+  currentPropanePressure[0] = (raw1 / 1024.0) * 150;
+  currentPropanePressure[1] = (raw2 / 1024.0) * 150;
+}
+
+// Method to read the current shore water PSI. 100psi == 1024
+float readShoreWaterPressure() {
+  int raw = analogRead(analogPins[SHORE_WATER_PRESSURE]);
+  currentWaterPressure = (raw / 1024.0) * 150;
+}
+
+// Water flow interrupt function
+void measureFlow () {
+   flowFrequency++;
+}
+
+// Process flow pulses
+void processFlow() {
+  // Calculate GPM every second
+  if(millis() >= flowLoopTime + 1000) {    
+    // Disable the interrupt while calculating flow rate
+    detachInterrupt(digitalPinToInterrupt(WATER_FLOW_PIN));
+
+    // Because this loop may not complete in exactly 1 second intervals we calculate the number of milliseconds that have passed 
+    // since the last execution and use that to scale the output. We also apply the calibration factor to scale the output based 
+    // on the number of pulses per second per units of measure (litres/minute) coming from the sensor.
+    currentWaterFlow = ((1000.0 / (millis() - flowLoopTime)) * flowFrequency) / FLOW_SENSOR_CALI_FACTOR; // Liters per minute
+
+    // Convert to freedom units (1 lmp == ~0.2642 gpm)
+    currentWaterFlow = currentWaterFlow * 0.2642;
+
+    // Reset the counter
+    flowFrequency = 0;
+
+    // Reattach innturrupt to start counting again
+    attachInterrupt(digitalPinToInterrupt(WATER_FLOW_PIN), measureFlow, RISING); 
+  }
 }
