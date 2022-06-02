@@ -1,0 +1,34 @@
+{
+  "name": "BusElectronicsMain",
+  "version": "0.0.1",
+  "description": "Front/Backend for Controlling the electronics on my Skoolie",
+  "main": " ",
+  "scripts": {
+    "build-frontend": "cd frontend/ && npm run build && cd ../",
+    "build-backend": "cd backend/ && npm run build && cd ../",
+    "build-all": "npm run build-frontend && npm run build-backend",
+    "move-built-frontend": "npx copy frontend/build/**/* backend/public",
+    "bin-win": "cd backend && npm run build-bin-win && cd ../",
+    "bin-linux": "cd backend && npm run build-bin-linux && cd ../",
+    "bin-armlinux": "cd backend && npm run build-bin-armlinux && cd ../",
+    "build-binary-win": "npm run build-all && npm run move-built-frontend && npm run bin-win",
+    "build-binary-linux": "npm run build-all && npm run move-built-frontend && npm run bin-linux",
+    "build-binary-armlinux": "npm run build-all && npm run move-built-frontend && npm run bin-armlinux",
+    "install-all": "cd backend && npm i && cd ../frontend && npm i && cd ../"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Techno11/BusElectronics.git"
+  },
+  "keywords": [
+    "bus",
+    "skoolie",
+    "school bus conversion"
+  ],
+  "author": "Soren Zaiser",
+  "license": "Unlicense",
+  "bugs": {
+    "url": "https://github.com/Techno11/BusElectronics/issues"
+  },
+  "homepage": "https://github.com/Techno11/BusElectronics#readme"
+}

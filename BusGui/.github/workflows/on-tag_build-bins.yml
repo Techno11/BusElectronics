@@ -1,0 +1,53 @@
+name: Build Binaries
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: busgui-backend.exe
+            asset_name: busgui-windows.exe
+            cmd: build-binary-win
+            
+          - os: ubuntu-latest
+            artifact_name: busgui-backend
+            asset_name: busgui-linux-amd64
+            cmd: build-binary-linux
+                      
+          - os: ubuntu-latest
+            artifact_name: busgui-backend
+            asset_name: busgui-linux-arm64
+            cmd: build-binary-armlinux
+
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+      - name: Use Node.js 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: Install, Compile, and Build Binary
+        run: |
+          npm run install-all
+          npm run ${{ matrix.cmd }}
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: bin/${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.ref }}
