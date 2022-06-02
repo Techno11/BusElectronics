@@ -1,6 +1,6 @@
 import {type} from "os";
 
-type Command = ColorCommand | IntensityCommand;
+type Command = ColorCommand | IntensityCommand | RelayCommand;
 
 type CommandBase = {
   fixture: Fixture
@@ -13,6 +13,11 @@ type ColorCommand = {
   red: number,
   green: number,
   blue: number
+} & CommandBase
+
+type RelayCommand = {
+  type: CommandType.Relay
+  state: RelayControlType
 } & CommandBase
 
 type IntensityCommand = {
@@ -80,7 +85,13 @@ enum Device {
 
 enum CommandType {
   Intensity,
-  Color
+  Color,
+  Relay,
+}
+
+enum RelayControlType {
+  Auto,
+  Manual
 }
 
 /**
@@ -107,6 +118,12 @@ const validateCommand = (data: Command) => {
       typeof data.intensity === "number" &&
       data.intensity >= 0 && data.intensity <= 255
     )
+  } else if (data.type === CommandType.Relay) {
+    return (
+      typeof data.state === "number" &&
+      data.state <= 0 &&
+      data.state < 2
+    )
   } else {
     return false;
   }
@@ -127,6 +144,8 @@ const formatCommand = (command: Command): number[] => {
     commandArr.push(command.intensity);
   } else if (command.type === CommandType.Color) {
     commandArr.push(command.red, command.green, command.blue);
+  } else if (command.type === CommandType.Relay) {
+    commandArr.push(command.state);
   }
   return commandArr;
 }

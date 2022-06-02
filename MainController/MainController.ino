@@ -51,8 +51,19 @@
  * 01 => 16 - Water Flow Rate
  */
 
+/* Water Pump State */
+#define WATER_PUMP_AUTO 0
+#define WATER_PUMP_MANUAL 1
+
+/* Relay Control Modes */
+#define RELAY_CTRL_AUTO 0
+#define RELAY_CTRL_MANUAL 1
+
 /* How often to send status packets */
 #define SEND_STAUS_EVERY_MILLISECONDS 2000
+
+/* Water Pressure AUto-Switch Threshold (PSI) */
+#define WATER_PRESSURE_THRESHOLD 10
 
 /* Water Flow is a Hall-Effect Sensor */
 #define WATER_FLOW_PIN 2
@@ -145,7 +156,7 @@ void setup() {
   // Initilize Output (Dimmer) pins
   for(int i = 0; i < NUM_DIMMERS; i++) { pinMode(dimmerPins[i], OUTPUT); analogWrite(dimmerPins[i], 0);}
   // Initilize Relay pins
-  for(int i = 0; i < NUM_RELAYS; i++) { pinMode(relayPins[i], OUTPUT); digitalWrite(relayPins[i], HIGH);}
+  for(int i = 0; i < NUM_RELAYS; i++) { pinMode(relayPins[i], OUTPUT); setRelay(i, true);}
   // Initlize LEDS
   FastLED.addLeds<NEOPIXEL, LED_PIN_0>(ledStrips[0], ledCount[0]);
   FastLED.addLeds<NEOPIXEL, LED_PIN_1>(ledStrips[1], ledCount[1]);
@@ -179,6 +190,8 @@ float currentPropanePressure[2] = {0.0, 0.0}; // psi
 float currentWaterPressure = 0.0; // psi
 float currentWaterFlow = 0.0; // gallons per minute
 int lastButtonReads[] = {1, 1, 1, 1, 1, 1, 1, 1};
+boolean relayStates[NUM_RELAYS] = {false, false, false, false, false, false, false, false};
+int waterPumpRunState = 0;
 
 // Track status updates
 long lastStatusSent = 0;
@@ -218,6 +231,28 @@ void loop() {
   }
 }
 
+// Toggle Relay
+void setRelay(int relay, boolean state) {
+  // Relay is already at requested state
+  if(relayStates[relay] == state) return;
+  // Set to requested state
+  if(state) {
+    digitalWrite(relayPins[relay], HIGH);
+  } else {
+    digitalWrite(relayPins[relay], LOW);
+  }
+  // Update state
+  relayStates[relay] = state;
+}
+
+// Process water pressure
+void processWaterPressure() {
+  // If water pump run state is auto
+  if(waterPumpRunState == WATER_PUMP_AUTO) {
+    setRelay(WATER_PUMP_RELAY, currentWaterPressure >= WATER_PRESSURE_THRESHOLD);
+  }
+}
+
 // Read DIO pins
 void readDIO() {
   for(int i = 0; i < NUM_INPUTS; i++) {
@@ -240,14 +275,18 @@ void readDIO() {
 }
 
 /* Serial bits for a "command" are in this order:
-* 0 - Command Type (0 = Intensity, 1 = Color)
+* 0 - Command Type (0 = Intensity, 1 = Color, 2 = Relay)
 * 1 - Device (0 = Mosfet, 1 = Relay, 2 = LED, 3 = Digital, 4 = Analog)
 * 2 - Fixture
 * 3 - 0 = Off, 1 = On
-* 4 - Data 1 (Intensity, Red)
+* 4 - Data 1 (Intensity, Red, RelayControlMode)
 * 5 - Data 2 (Green)
 * 6 - Data 3 (Blue)
 * ...
+* 
+* RelayControlMode:
+* 0 = Auto
+* 1 = Manual
  */
 void doSerial() {
   while (Serial.available() > 0){
@@ -271,6 +310,8 @@ void doSerial() {
         setupAnimation(command[2], command[4], 255);
       } else if (command[0] == 1) {   // "Color" Command
         processLeds(command[2], command[4], command[5], command[6]);
+      } else if (command[0] == 1) {   // "Relay" Command
+        processRelay(command[2], command[3], command[4]);
       }
 
       //Reset for the next message
@@ -279,6 +320,26 @@ void doSerial() {
   }
 }
 
+// Process a relay command
+void processRelay(int fixture, int toggle, int ctrlMode) {
+  if(fixture == WATER_PUMP_RELAY){
+    if(ctrlMode == RELAY_CTRL_AUTO) {
+      // We're commanding automatic control, if pressure is above threshold, enable relay
+      setRelay(WATER_PUMP_RELAY, currentWaterPressure >= WATER_PRESSURE_THRESHOLD);
+      // Set control state
+      waterPumpRunState = WATER_PUMP_AUTO;
+    } else {
+      // We're commanding manual control, if toggle is 1 (on) then enable relay
+      setRelay(WATER_PUMP_RELAY, toggle == 1);
+      // Set control state
+      waterPumpRunState = WATER_PUMP_MANUAL;
+    }
+  } else {
+    setRelay(fixture, toggle == 1);
+  }
+}
+
+// Process a LED command
 void processLeds(int fixture, int red, int green, int blue) {
   if(fixture > 1 && fixture < 4) {
     for(int i = 0; i < ledCount[fixture]; i++) {
@@ -307,8 +368,10 @@ void sendStatus() {
   Serial.print(currentPropanePressure[1]);
   Serial.print(",\"shore_water_pressure\":");
   Serial.print(currentWaterPressure);
+  Serial.print(",\"water_pump_run_state\":");
+  Serial.print(waterPumpRunState);
   Serial.print(",\"water_flow\":");
-  Serial.print(currentWaterFlow);
+  Serial.print(currentWaterFlow);-
   Serial.print(",\"digital_inputs\":[");
   Serial.print(lastButtonReads[0]);
   Serial.print(",");
@@ -325,6 +388,22 @@ void sendStatus() {
   Serial.print(lastButtonReads[6]);
   Serial.print(",");
   Serial.print(lastButtonReads[7]);
+  Serial.print("],\"relays\":[");
+  Serial.print(relayStates[0]);
+  Serial.print(",");
+  Serial.print(relayStates[1]);
+  Serial.print(",");
+  Serial.print(relayStates[2]);
+  Serial.print(",");
+  Serial.print(relayStates[3]);
+  Serial.print(",");
+  Serial.print(relayStates[4]);
+  Serial.print(",");
+  Serial.print(relayStates[5]);
+  Serial.print(",");
+  Serial.print(relayStates[6]);
+  Serial.print(",");
+  Serial.print(relayStates[7]);
   Serial.print("],\"dimmers\":[");
   Serial.print(dimmerAnimations[0][CURRENT_BRIGHTNESS]);
   Serial.print(",");

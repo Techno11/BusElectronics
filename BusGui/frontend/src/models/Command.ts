@@ -1,7 +1,8 @@
 import LEDColor from "./LEDColor";
 import Mosfet from "./Mosfet";
+import Relay, {RelayControlType} from "./Relay";
 
-type Command = ColorCommand | IntensityCommand;
+type Command = ColorCommand | IntensityCommand | RelayCommand;
 
 type CommandBase = {
   fixture: Fixture
@@ -19,6 +20,11 @@ type ColorCommand = {
 type IntensityCommand = {
   type: CommandType.Intensity
   intensity: number
+} & CommandBase
+
+type RelayCommand = {
+  type: CommandType.Relay
+  state: RelayControlType
 } & CommandBase
 
 type Fixture = MosfetFixtures | RelayFixtures | LEDFixtures | DigitalFixtures | AnalogFixtures;
@@ -81,6 +87,7 @@ enum Device {
 enum CommandType {
   Intensity,
   Color,
+  Relay,
 }
 
 const getName = (device: Device, fixture: Fixture) => {
@@ -163,15 +170,27 @@ const makeMosfetCommand = (device: Device, fixture: Fixture, state: Mosfet): Com
   }
 }
 
+const makeRelayCommand = (fixture: Fixture, state: Relay): Command => {
+  return {
+    type: CommandType.Relay,
+    device: Device.RELAY,
+    fixture,
+    state: state.state,
+    on: state.on
+  }
+}
+
 export {
   CommandType,
   Device,
   AnalogFixtures,
   DigitalFixtures,
+  RelayFixtures,
   LEDFixtures,
   MosfetFixtures,
   makeLedCommand,
   makeMosfetCommand,
+  makeRelayCommand,
   getName,
 }
 export default Command;

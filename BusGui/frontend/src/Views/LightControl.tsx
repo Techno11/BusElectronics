@@ -1,5 +1,5 @@
 import React from "react";
-import {Box, Fab, Grid, Slider, Typography} from "@mui/material";
+import {Box, Grid, Slider, Typography} from "@mui/material";
 import FadableLightIcon from "../components/FadableLightIcon";
 import {useState} from "preact/hooks";
 import {
@@ -12,14 +12,8 @@ import {
 } from "../models/Command";
 import {AlphaPicker, ColorResult, HuePicker} from "react-color"
 import LEDColor, {getNew as newLED, getRGBA} from "../models/LEDColor"
-import {ExitToApp} from "@mui/icons-material";
 import {useBus} from "../data/hooks/useSocket";
 import Mosfet, {getNew as newFet} from "../models/Mosfet";
-
-interface IProps {
-  goBack: () => void,
-}
-
 
 const bedroomHalfWidth = '15vw';
 const rearAisleWidth = '22.5vw';
@@ -28,8 +22,7 @@ const frontEntryWidth = "14vw";
 const radius = "10px";
 const border = "solid 5px white";
 
-
-const LightControl = ({goBack}: IProps) => {
+const LightControl = () => {
 
   // Hooks
   const bus = useBus();
@@ -227,11 +220,6 @@ const LightControl = ({goBack}: IProps) => {
           </>
         }
       </Box>
-
-      {/* Exit/Go Back Button */}
-      <Fab size={"small"} sx={{m: 0, right: "10px", bottom: "10px", position: 'fixed'}} onClick={goBack}>
-        <ExitToApp />
-      </Fab>
     </>
   )
 }

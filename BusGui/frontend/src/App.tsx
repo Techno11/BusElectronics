@@ -1,110 +1,103 @@
 import * as React from 'react';
-import {Box, Container, Grid, Typography} from "@mui/material";
+import {Box, Container, Fab, Tooltip} from "@mui/material";
 import LightControl from "./Views/LightControl";
-import {useState} from "preact/hooks";
+import {useEffect, useState} from "preact/hooks";
 import Dashboard from "./Views/Dashboard";
-import {AirportShuttle, Dashboard as DashboardIcon, DirectionsCar, DoorFront, Hotel, Light} from "@mui/icons-material";
+import Views from "./models/Views";
+import Home from "./Views/Home";
+import {ExitToApp} from "@mui/icons-material";
+import BusInfo from "./models/BusInfo";
+import {useBus} from "./data/hooks/useSocket";
 
-enum Views {
-  Lights,
-  Dashboard,
-  Main,
-}
+const makePageTitle = (t: string) => `${t} | BSOD the Bus`
 
 export default function App() {
 
-  const [currentView, setCurrentView] = useState<Views>(Views.Main)
+  // Hooks
+  const bus = useBus();
 
-  const sxBase = {
-    ml: "auto",
-    border: "solid 5px white",
-    width: "45vw",
-    borderRadius: "10px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center"
+  // State
+  const [currentView, setCurrentView] = useState<Views>(Views.Home);
+  const [busData, setBusData] = useState<BusInfo>({} as BusInfo);
+
+  useEffect(() => {
+    // Register listener to update bus data
+    bus.addListener("app", setBusData);
+
+    switch(document.location.pathname.toLowerCase()) {
+      case "/lights":
+        setCurrentView(Views.Lights);
+        break;
+      case "/dashboard":
+        setCurrentView(Views.Dashboard);
+        break;
+      case "/presets/main":
+        setCurrentView(Views.MainPresets);
+        break;
+      case "/presets/entry":
+        setCurrentView(Views.EntryPresets);
+        break;
+      case "/presets/driver":
+        setCurrentView(Views.DriverPresets);
+        break;
+      case "/presets/bedroom":
+        setCurrentView(Views.BedroomPresets);
+        break;
+      default: // unknown url
+        window.history.replaceState(null, makePageTitle("Home"), "/")
+        break;
+    }
+  }, []); // eslint-disable-line
+
+  const goTo = (view: Views) => {
+    switch(view) {
+      case Views.Lights:
+        window.history.pushState(null, makePageTitle("Lights"), "/lights")
+        break;
+      case Views.Dashboard:
+        window.history.pushState(null, makePageTitle("Dashboard"), "/dashboard")
+        break;
+      case Views.MainPresets:
+        window.history.pushState(null, makePageTitle("Main Presets"), "/presets/main")
+        break;
+      case Views.EntryPresets:
+        window.history.pushState(null, makePageTitle("Entry Presets"), "/presets/entry")
+        break;
+      case Views.DriverPresets:
+        window.history.pushState(null, makePageTitle("Driver Presets"), "/presets/driver")
+        break;
+      case Views.BedroomPresets:
+        window.history.pushState(null, makePageTitle("Bedroom Presets"), "/presets/bedroom")
+        break;
+      case Views.Home:
+        window.history.pushState(null, makePageTitle("Home"), "/")
+        break;
+    }
+    setCurrentView(view);
   }
 
   return (
     <Container sx={{width: "100vw", height: "95vh", m: 0, p: 0}}>
       <Box sx={{ m: "auto", mt: 1 }}>
         {currentView === Views.Lights &&
-          <LightControl goBack={() => setCurrentView(Views.Main)} />
+          <LightControl />
         }
         {currentView === Views.Dashboard &&
-          <Dashboard goBack={() => setCurrentView(Views.Main)} />
+          <Dashboard data={busData} />
         }
-        {currentView === Views.Main &&
-          <>
-            {/* Title*/}
-            <Box sx={{textAlign: "center"}}>
-              <Typography variant={"h4"}>BSOD the Bus Control Center</Typography>
-            </Box>
-
-            {/* Lights/Dashboard Buttons */}
-            <Grid container direction={"row"}>
-              <Grid
-                item
-                sx={{ ...sxBase, height: "60vh" }}
-                onClick={() => setCurrentView(Views.Lights)}
-              >
-                <Box sx={{textAlign: "center"}}>
-                  <Light fontSize={"large"} />
-                  <Typography>Control Lights</Typography>
-                </Box>
-              </Grid>
-              <Grid
-                item
-                sx={{ ...sxBase, height: "60vh" }}
-                onClick={() => setCurrentView(Views.Dashboard)}
-              >
-                <Box sx={{textAlign: "center"}}>
-                  <DashboardIcon fontSize={"large"} />
-                  <Typography>View Dashboard</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-
-            {/* Scene Selection Viewer Top Row*/}
-            <Grid container direction={"row"} sx={{my: 1}}>
-              <Grid
-                item
-                sx={{ ...sxBase, height: "10vh"}}
-                onClick={() => setCurrentView(Views.Lights)}
-              >
-                <AirportShuttle sx={{mr: 2}} />
-                <Typography>Main Presets</Typography>
-              </Grid>
-              <Grid
-                item
-                sx={{ ...sxBase, height: "10vh" }}
-                onClick={() => setCurrentView(Views.Dashboard)}
-              >
-                <DirectionsCar sx={{mr: 2}} />
-                <Typography>Driver Presets</Typography>
-              </Grid>
-            </Grid>
-
-            {/* Scene Selection Viewer Bottom Row*/}
-            <Grid container direction={"row"} sx={{my: 1}}>
-              <Grid
-                item
-                sx={{ ...sxBase, height: "10vh" }}
-                onClick={() => setCurrentView(Views.Lights)}
-              >
-                <DoorFront sx={{mr: 2}} />
-                <Typography>Entry Presets</Typography>
-              </Grid>
-              <Grid
-                item
-                sx={{ ...sxBase, height: "10vh" }}
-                onClick={() => setCurrentView(Views.Dashboard)}
-              >
-                <Hotel sx={{mr: 2}} />
-                <Typography>Bedroom Presets</Typography>
-              </Grid>
-            </Grid>
-          </>
+        {currentView === Views.Home &&
+          <Home setCurrentView={goTo} />
+        }
+        {currentView !== Views.Home &&
+          <Fab
+            size={"small"}
+            sx={{m: 0, right: "10px", bottom: "10px", position: 'fixed'}}
+            onClick={() => goTo(Views.Home)}
+          >
+            <Tooltip title={"Main Menu"}>
+              <ExitToApp />
+            </Tooltip>
+          </Fab>
         }
       </Box>
     </Container>
