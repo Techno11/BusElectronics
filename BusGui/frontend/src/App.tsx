@@ -22,7 +22,9 @@ export default function App() {
 
   useEffect(() => {
     // Register listener to update bus data
-    bus.addListener("app", setBusData);
+    bus.addListener("app", payload => {
+      if(payload.type === "info" && payload.data) setBusData(payload.data)
+    });
 
     switch(document.location.pathname.toLowerCase()) {
       case "/lights":

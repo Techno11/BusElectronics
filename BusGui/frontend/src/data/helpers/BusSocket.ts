@@ -1,9 +1,9 @@
 import {io, Socket} from "socket.io-client";
 import Command from "../../models/Command";
+import SocketMessage from "../../models/SocketMessage";
 
 const rateLimit = 50; // how many MS to wait between sending requests to avoid spamming
-// TODO: use model for payload
-type Listener = (payload: any) => any;
+type Listener = (payload: SocketMessage) => any;
 type ListenerPool = {[key: string]: Listener};
 
 export default class BusSocket {
@@ -14,6 +14,7 @@ export default class BusSocket {
 
   constructor(path: string) {
     this._socket = io(path);
+    this._socket.on("arduino-update", d => this._emitAll(d))
   }
 
   /**
@@ -55,7 +56,7 @@ export default class BusSocket {
    * @param payload
    * @private
    */
-  private _emitAll(payload: any) {
+  private _emitAll(payload: SocketMessage) {
     for(const key in this._listenerPool) {
       this._listenerPool[key](payload);
     }
