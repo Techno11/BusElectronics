@@ -72,9 +72,8 @@ jobs:
 
       
       # Install emulation things for Docker
-      - name: Install QEMU emulation tools
-        run: |-
-          apt-get install qemu binfmt-support qemu-user-static
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
 
       # Build binary in a docker image so we can build on an ARM platform
