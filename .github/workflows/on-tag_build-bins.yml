@@ -79,7 +79,7 @@ jobs:
       # Build binary in a docker image so we can build on an ARM platform
       - name: Build Binary
         run: |-
-          docker build -f ./BusGui/backend/GithubActions.Dockerfile -o out .
+          DOCKER_BUILDKIT=1 docker build -f ./BusGui/backend/GithubActions.Dockerfile -o out .
             .
 
       - name: Upload binaries to release
