@@ -1,7 +1,10 @@
-FROM arm64v8/node:14 AS build
+FROM arm64v8/node:14-alpine AS build
+
+# Install dependencies for node-gyp
+RUN apk add --no-cache make gcc g++ python3 linux-headers udev
 
 # Make directory for build
-RUN mkdir /app/server
+RUN mkdir -p /app/server
 
 # Set work directory
 WORKDIR /app/server
@@ -24,4 +27,4 @@ RUN npm run build-bin-arm64linux
 FROM build as export
 
 # Copy built binary
-COPY --from=build /app/bin/busgui-backend .
+COPY --from=build /app/bin/busgui-backend ./
