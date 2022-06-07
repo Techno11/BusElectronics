@@ -6,7 +6,7 @@ on:
       - '*'
 
 jobs:
-  publish:
+  publish-x86:
     name: Build BusGui for ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     defaults:
@@ -27,13 +27,6 @@ jobs:
             artifact_name: busgui-backend
             asset_name: busgui-linux-amd64
             cmd: build-binary-linux
-                      
-          - os: ubuntu-latest
-            name: Linux arm64
-            artifact_name: busgui-backend
-            asset_name: busgui-linux-arm64
-            cmd: build-binary-armlinux
-
 
     steps:
       - uses: actions/checkout@v2
@@ -53,5 +46,47 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: BusGui/bin/${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.ref }}
+          
+  publish-arm:
+    name: Build BusGui for ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:            
+          - os: ubuntu-latest
+            name: Linux arm64v8
+            artifact_name: busgui-backend
+            asset_name: busgui-linux-amd64
+            cmd: build-binary-linux
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+
+      
+      # Install emulation things for Docker
+      - name: Install QEMU emulation tools
+        run: |-
+          apt-get install qemu binfmt-support qemu-user-static
+
+
+      # Build binary in a docker image so we can build on an ARM platform
+      - name: Build Binary
+        run: |-
+          docker build -f ./BusGui/backend/Dockerfile -o out .
+            .
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: BusGui/backend/out/app/bin${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}

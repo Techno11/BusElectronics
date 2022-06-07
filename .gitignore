@@ -4,3 +4,4 @@ build/
 .idea/
 BusGui/backend/public/*
 bin/
+BusGui/backend/out/
