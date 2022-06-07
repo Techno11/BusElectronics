@@ -9,7 +9,7 @@
     "build": "tsc",
     "build-bin-win": "pkg . -t node14-win",
     "build-bin-linux": "pkg . -t node14-linux",
-    "build-bin-armlinux": "pkg . -t node14-linux-arm64"
+    "build-bin-arm64linux": "pkg . -t node14-linux-arm64"
   },
   "author": "Soren Zaiser",
   "license": "ISC",
