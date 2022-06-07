@@ -24,13 +24,7 @@ RUN npm run build
 # Build Binary
 RUN npm run build-bin-arm64linux
 
-FROM alpine as export
-
-# Make app directory
-RUN mkdir -p /app
-
-# Set app as working directory
-WORKDIR /app
+FROM scratch as export
 
 # Copy built binary
 COPY --from=build /app/bin/busgui-backend ./
