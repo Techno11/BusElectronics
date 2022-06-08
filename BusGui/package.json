@@ -14,7 +14,7 @@
     "build-binary-linux": "npm run build-all && npm run move-built-frontend && npm run bin-linux",
     "install-all": "cd backend && npm i && cd ../frontend && npm i && cd ../",
     "install-frontend": "cd frontend && npm i && cd ../",
-	"prep-arm-build": "npm run install-frontend && npm run build-frontend && npm run move-build-frontend"
+	"prep-arm-build": "npm run install-frontend && npm run build-frontend && npm run move-built-frontend"
   },
   "repository": {
     "type": "git",
