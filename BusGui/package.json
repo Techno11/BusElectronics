@@ -10,11 +10,11 @@
     "move-built-frontend": "npx copy frontend/build/**/* backend/public",
     "bin-win": "cd backend && npm run build-bin-win && cd ../",
     "bin-linux": "cd backend && npm run build-bin-linux && cd ../",
-    "bin-armlinux": "cd backend && npm run build-bin-armlinux && cd ../",
     "build-binary-win": "npm run build-all && npm run move-built-frontend && npm run bin-win",
     "build-binary-linux": "npm run build-all && npm run move-built-frontend && npm run bin-linux",
-    "build-binary-armlinux": "npm run build-all && npm run move-built-frontend && npm run bin-armlinux",
-    "install-all": "cd backend && npm i && cd ../frontend && npm i && cd ../"
+    "install-all": "cd backend && npm i && cd ../frontend && npm i && cd ../",
+    "install-frontend": "cd frontend && npm i && cd ../",
+	"prep-arm-build": "npm run install-frontend && npm run build-frontend && npm run move-build-frontend"
   },
   "repository": {
     "type": "git",

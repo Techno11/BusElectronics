@@ -75,6 +75,11 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
+      # Build frontend
+      - name: Install and Build Frontend
+        run: |
+          cd BusGui
+          npm run prep-arm-build
 
       # Build binary in a docker image so we can build on an ARM platform
       - name: Build Binary

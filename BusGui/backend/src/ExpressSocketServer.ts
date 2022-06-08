@@ -43,7 +43,7 @@ class ExpressSocketServer {
   }
 
   private setupMiddleware() {
-    this.app.use(express.static(path.resolve(__dirname + '../public'), {maxAge: 2628000})); // One month
+    this.app.use(express.static(path.resolve(__dirname, '../public'), {maxAge: 2628000})); // One month
 
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       res.header('Access-Control-Allow-Origin', '*');
@@ -54,8 +54,10 @@ class ExpressSocketServer {
     this.app.use(cors());
     this.app.use(helmet());
 
-    this.app.use("/*", (req: Request, res: Response) => {
-      res.sendFile(path.resolve(__dirname + '../public/index.html'));
+    this.app.use((req: Request, res: Response) => {
+      if (req.path !== '/api' && !req.path.startsWith('/api/')) {
+        return res.sendFile(path.resolve(__dirname, '../public/index.html'));
+      }
     });
   }
 
