@@ -80,7 +80,6 @@ jobs:
       - name: Build Binary
         run: |-
           DOCKER_BUILDKIT=1 docker build -f ./BusGui/backend/GithubActions.Dockerfile -o out .
-            .
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2

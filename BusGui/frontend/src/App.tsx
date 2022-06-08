@@ -62,6 +62,7 @@ export default function App() {
       case Views.MainPresets:
         window.history.pushState(null, makePageTitle("Main Presets"), "/presets/main")
         break;
+        
       case Views.EntryPresets:
         window.history.pushState(null, makePageTitle("Entry Presets"), "/presets/entry")
         break;
