@@ -62,7 +62,7 @@ jobs:
           - os: ubuntu-latest
             name: Linux arm64v8
             artifact_name: busgui-backend
-            asset_name: busgui-linux-amd64
+            asset_name: busgui-linux-arm64v8
             cmd: build-binary-linux
 
     steps:
