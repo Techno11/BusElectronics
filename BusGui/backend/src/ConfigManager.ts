@@ -39,20 +39,20 @@ export default class ConfigManager {
     // @ts-ignore
     if (!loadSuccess || !this.configuration){
       this.configuration = {
-        arduino_data_serialport: process.env.DATA_SERIALPORT || "",
-        arduino_update_serialport: process.env.UPDATE_SERIALPORT || "",
+        arduino_data_serialport: process.env.DATA_SERIALPORT || "/dev/tty1",
+        arduino_update_serialport: process.env.UPDATE_SERIALPORT || "/dev/tty1",
         arduino_data_baud: parseInt(process.env.DATA_BAUD ?? "115200") || 115200,
       }
     }
 
     // Check configuration integrity and load defaults
     if (!this.configuration.arduino_update_serialport) {
-      this.configuration.arduino_update_serialport = process.env.UPDATE_SERIALPORT || "";
+      this.configuration.arduino_update_serialport = process.env.UPDATE_SERIALPORT || "/dev/tty1";
       updateFile = true;
     }
 
     if (!this.configuration.arduino_data_serialport) {
-      this.configuration.arduino_data_serialport = process.env.DATA_SERIALPORT || "";
+      this.configuration.arduino_data_serialport = process.env.DATA_SERIALPORT || "/dev/tty1";
       updateFile = true;
     }
 

@@ -1,7 +1,7 @@
 FROM arm64v8/node:14-alpine AS build
 
 # Install dependencies for node-gyp
-RUN apk add --no-cache make gcc g++ python3 linux-headers udev
+RUN apk add --no-cache make gcc g++ python3 linux-headers udev git
 
 # Make directory for build
 RUN mkdir -p /app/server

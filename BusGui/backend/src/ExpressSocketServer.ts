@@ -48,6 +48,8 @@ class ExpressSocketServer {
 
   private setupMiddleware() {
 
+    this.app.use(express.static(path.resolve(__dirname, '../public'), {maxAge: 2628000})); // One month
+
     this.app.use(bodyParser.json());
 
     this.app.use(bodyParser.urlencoded({ extended: true, inflate: true, limit: '100mb' }));
@@ -86,8 +88,6 @@ class ExpressSocketServer {
         }
       }
     });
-
-    this.app.use(express.static(path.resolve(__dirname, '../public'), {maxAge: 2628000})); // One month
 
     this.app.use((req: Request, res: Response) => {
       if (req.path !== '/api' && !req.path.startsWith('/api/')) {
