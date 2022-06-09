@@ -1,20 +1,38 @@
 import {io, Socket} from "socket.io-client";
 import Command from "../../models/Command";
 import SocketMessage from "../../models/SocketMessage";
+import Config, {SocketConfigResponse} from "../../models/Config";
 
 const rateLimit = 50; // how many MS to wait between sending requests to avoid spamming
 type Listener = (payload: SocketMessage) => any;
-type ListenerPool = {[key: string]: Listener};
+type ListenerPool = { [key: string]: Listener };
 
 export default class BusSocket {
+  private _path: string;
   private _socket: Socket;
   private _lastReq: number = 0;
 
   private _listenerPool: ListenerPool = {};
 
   constructor(path: string) {
-    this._socket = io(path);
-    this._socket.on("arduino-update", d => this._emitAll(d))
+    this._path = path;
+    // Setup socket
+    this._socket = io(path, {autoConnect: false});
+    // Setup events
+    this._socket.on("arduino-update", d => this._emitAll(d));
+    this._socket.on("connect", () => this._emitAll({type: "socket", connected: true}));
+    this._socket.on("disconnect", () => this._emitAll({type: "socket", connected: false}));
+    this._socket.on("error", () => this._emitAll({type: "socket", connected: false}));
+    this._socket.on("reconnect", () => this._emitAll({type: "socket", connected: true}));
+    // Connect socket
+    this._socket.connect();
+  }
+
+  /**
+   * Get if socket is connected
+   */
+  public isConnected(): boolean {
+    return this._socket.connected;
   }
 
   /**
@@ -23,7 +41,7 @@ export default class BusSocket {
    */
   public runCommand(command: Command): Promise<boolean> {
     return new Promise(resolve => {
-      if(Date.now() - this._lastReq >  rateLimit) {
+      if (Date.now() - this._lastReq > rateLimit) {
         this._socket.on("control-response", json => {
           resolve(json.success)
         })
@@ -32,6 +50,82 @@ export default class BusSocket {
       } else {
         resolve(false);
       }
+    })
+  }
+
+  /**
+   * Get config
+   */
+  public getConfig(): Promise<SocketConfigResponse | false> {
+    return new Promise(resolve => {
+      this._socket.on("get-config-response", json => {
+        if (!json.success) resolve(false);
+        else resolve(json);
+      })
+      this._socket.emit("get-config");
+    })
+  }
+
+  /**
+   * Get status
+   */
+  public getStatus(): Promise<{healthy: boolean, last_heartbeat: Date}> {
+    return new Promise(resolve => {
+      this._socket.on("get-status-response", json => {
+        resolve({healthy: json.healthy, last_heartbeat: new Date(json.last_heartbeat)})
+      })
+      this._socket.emit("get-status");
+    })
+  }
+
+  /**
+   * Update config
+   */
+  public updateConfig(key: keyof Config, val: any): Promise<boolean> {
+    return new Promise(resolve => {
+      this._socket.once("update-config-response", json => {
+        resolve(json.success);
+      })
+      this._socket.emit("update-config", {key, val});
+    })
+  }
+
+  /**
+   * Perform an arduino update
+   * @param file HEX file to send to arduino
+   * @param onUploadComplete optional callback for when file is done uploading
+   */
+  public doUpdate(file: File, onUploadComplete?: () => any): Promise<boolean> {
+    return new Promise(resolve => {
+      this._socket.once("update-arduino-response", json => {
+        console.log(json)
+        resolve(json.success);
+      });
+      // Create form data
+      const formData = new FormData();
+      formData.append("file", file);
+      // Upload file
+      fetch(document.location.protocol + "//" + this._path + "/api/arduino/update", {method: "POST", body: formData})
+        .then(() => {
+          if(typeof onUploadComplete === "function") onUploadComplete();
+        })
+        .catch(() => {
+          // de-register listener
+          this._socket.off("update-arduino-response");
+          // resolve failure
+          resolve(false)
+        });
+    })
+  }
+
+  /**
+   * Send signal to kill API (and technically systemd will restart it, hopefully)
+   */
+  public restartServer(): Promise<boolean> {
+    return new Promise(resolve => {
+      // Register a listener for ourself on the reconnect event
+      this._socket.once("connect", () => resolve(true));
+      this._socket.emit("restart");
     })
   }
 
@@ -46,7 +140,7 @@ export default class BusSocket {
    * Remove a listener for the board-update event
    */
   public removeListener(key: string) {
-    if(typeof this._listenerPool[key] !== "undefined") {
+    if (typeof this._listenerPool[key] !== "undefined") {
       delete this._listenerPool[key];
     }
   }
@@ -57,7 +151,7 @@ export default class BusSocket {
    * @private
    */
   private _emitAll(payload: SocketMessage) {
-    for(const key in this._listenerPool) {
+    for (const key in this._listenerPool) {
       this._listenerPool[key](payload);
     }
   }

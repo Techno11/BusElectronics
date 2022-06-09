@@ -49,7 +49,7 @@ const WaterStatusTile = ({data}: IProps) => {
           });
         }}
       >
-        {showTank &&
+        {!!showTank &&
         <>
           <Typography
             variant={"h4"}

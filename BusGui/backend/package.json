@@ -1,6 +1,6 @@
 {
   "name": "busgui-backend",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "description": "Backend for the Bus GUI project",
   "main": "build/index.js",
   "scripts": {
@@ -9,22 +9,28 @@
     "build": "tsc",
     "build-bin-win": "pkg . -t node14-win",
     "build-bin-linux": "pkg . -t node14-linux",
-    "build-bin-arm64linux": "pkg . -t node14-linux-arm64 --public-packages \"*\" --public --no-bytecode"
+    "build-bin-arm64linux": "pkg . -t node14-linux-arm64"
   },
   "author": "Soren Zaiser",
   "license": "ISC",
   "dependencies": {
+    "appdata-path": "^1.0.0",
+    "avrgirl-arduino": "^5.0.1",
+    "body-parser": "^1.20.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
     "express": "^4.17.2",
     "helmet": "^5.0.2",
+    "multer": "^1.4.5-lts.1",
     "serialport": "^9.2.8",
     "socket.io": "^4.4.1",
     "typescript": "^4.6.4"
   },
   "devDependencies": {
+    "@types/body-parser": "^1.19.2",
     "@types/cors": "^2.8.12",
     "@types/express": "^4.17.13",
+    "@types/multer": "^1.4.7",
     "@types/node": "^17.0.35",
     "@types/serialport": "^8.0.2",
     "pkg": "^5.7.0"
@@ -34,7 +40,8 @@
     "assets": [
       "public/**/*",
       "node_modules/@serialport/**/*",
-      "node_modules/serialport/**/*"
+      "node_modules/serialport/**/*",
+      "package.json"
     ],
     "outputPath": "../bin"
   }

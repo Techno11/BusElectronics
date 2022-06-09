@@ -1,0 +1,1 @@
+{"water_percent":69.6,"version":1,"current":20.3,"propane_0":20.2,"propane_1":10.2,"shore_water_pressure":96.3,"water_pump_run_state":0,"water_flow":4.5,"digital_inputs":[0, 0, 0, 0, 0, 0, 0, 0],"relays":[0, 0, 0, 0, 0, 0, 0, 0],"dimmers":[255, 255, 255, 255, 255, 255, 255, 255, 255, 255]}

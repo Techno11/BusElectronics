@@ -3,6 +3,11 @@ import path from 'path';
 import Arduino from "./Arduino";
 import ExpressSocketServer from "./ExpressSocketServer";
 import {Socket} from "socket.io";
+import ConfigManager from "./ConfigManager";
+import serialport from "serialport";
+import Config from "./models/Config";
+import fs from "fs";
+const Avrgirl = require('avrgirl-arduino');
 
 // Setup dotenv
 dotenv.config({path: path.join(__dirname, '../.env')});
@@ -17,19 +22,12 @@ if (!process.env.PORT) process.exit(1);
 process.stdout.write('✅ PORT ')
 if (!process.env.HOST) process.exit(1);
 process.stdout.write('✅ HOST ')
-if (!process.env.SERIAL_PORT) process.exit(1);
-process.stdout.write('✅ SERIAL_PORT ')
-if (!process.env.SERIAL_BAUD) process.exit(1);
-process.stdout.write('✅ SERIAL_BAUD ')
-if (!process.env.EXPECT_HEARTBEAT_EVERY_SECONDS) process.exit(1);
-process.stdout.write('✅ EXPECT_HEARTBEAT_EVERY_SECONDS ')
-
 
 console.log('✅ env Check Passed. Starting Bus Backend v' + packageJson.version);
 
-const arduino = new Arduino();
+const config = new ConfigManager();
+const arduino = new Arduino(config);
 const io = new ExpressSocketServer().getIO();
-
 
 // Setup Socket Connector
 io.on('connection', async (client: Socket) => {
@@ -49,12 +47,58 @@ io.on('connection', async (client: Socket) => {
     // Emit to rest of server that there has been an update
     // TODO: Maybe??
     // client.broadcast.emit("command-executed", command);
-  })
+  });
+
+  client.on('get-config', () => {
+    serialport.list().then(r => {
+      client.emit("get-config-response", {success: true, serial: r, config: config.getConfig(), version: packageJson.version})
+    }).catch(() => {
+      client.emit("get-config-response", {success: false})
+    })
+  });
+
+  client.on('get-status', () => {
+    client.emit(
+      "get-status-response",
+      {success: true, healthy: arduino.isHealthy(), last_heartbeat: arduino.getLastHeartbeat()}
+    )
+  });
+
+  client.on('restart', () => {
+    process.exit(1);
+  });
+
+  client.on('update-config', ({key, val}: {key: keyof Config, val: any}) => {
+    // Update config
+    config.updateConfig(key, val);
+    // If we're updating either property for the data arduino connection, restart the arduino connection
+    if(key === 'arduino_data_baud' || key === 'arduino_data_serialport')  arduino.restart(config);
+    // Emit that we succeeded
+    client.emit('update-config-response', {success: true});
+  });
 });
 
 // Emit all Arduino updates to socket
 arduino.registerListener("main-listener", (data) => {
   io.emit("arduino-update", data);
+})
+
+// Listen for an arduino HEX file to be ready to deploy
+// @ts-ignore
+process.on("arduino-upload-ready", (filePath: string) => {
+  const mega = new Avrgirl({
+    board: 'mega',
+    port: config.getConfig().arduino_update_serialport
+  });
+  mega.flash(filePath, (error: any) => {
+    if(error) {
+      console.log("Avrgirl failed:\n", error)
+    }
+    // Emit success/failure
+    io.emit('update-arduino-response', {success: !error});
+    // Remove old hex file
+    fs.unlink(filePath, () => {});
+  })
 })
 
 

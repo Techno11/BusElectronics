@@ -4,6 +4,10 @@ import cors from "cors";
 import helmet from "helmet";
 import http from "http";
 import {Server as SocketServer} from 'socket.io';
+import getAppDataPath from "appdata-path";
+import fs from "fs";
+import bodyParser from "body-parser";
+import multer from "multer";
 
 /**
  * This class initializes a connection to our main bus arduino.
@@ -43,7 +47,10 @@ class ExpressSocketServer {
   }
 
   private setupMiddleware() {
-    this.app.use(express.static(path.resolve(__dirname, '../public'), {maxAge: 2628000})); // One month
+
+    this.app.use(bodyParser.json());
+
+    this.app.use(bodyParser.urlencoded({ extended: true, inflate: true, limit: '100mb' }));
 
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       res.header('Access-Control-Allow-Origin', '*');
@@ -54,9 +61,39 @@ class ExpressSocketServer {
     this.app.use(cors());
     this.app.use(helmet());
 
+    /* Save sent file to disk and load it onto arduino */
+    this.app.post("/api/arduino/update", multer().single('file'), (req, res) => {
+      try{
+        if(req.file) {
+          // Place to write file
+          const filePath = path.resolve(getAppDataPath("busgui"), "temp_upload.hex");
+
+          // write uploaded file to disk
+          fs.writeFileSync(filePath, req.file.buffer);
+
+          // We've "uploaded" the file, we're done here
+          res.status(200).send({success: true});
+
+          // @ts-ignore
+          process.emit("arduino-upload-ready", filePath);
+        } else {
+          res.status(400).send({success: false, error: 'Bad Request', route: req.path, method: req.method});
+        }
+      } catch(e) {
+        console.log(e);
+        if(!res.headersSent) {
+          res.status(500).send({success: false, error: e, route: req.path, method: req.method});
+        }
+      }
+    });
+
+    this.app.use(express.static(path.resolve(__dirname, '../public'), {maxAge: 2628000})); // One month
+
     this.app.use((req: Request, res: Response) => {
       if (req.path !== '/api' && !req.path.startsWith('/api/')) {
         return res.sendFile(path.resolve(__dirname, '../public/index.html'));
+      } else {
+        res.status(404).send({success: false, error: "Not Found", method: req.method, route: req.path});
       }
     });
   }

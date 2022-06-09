@@ -1,15 +1,16 @@
 import SerialPort from "serialport";
 import Command, {formatCommand, validateCommand} from "./models/Command";
 import SocketServerTransmitMessage, {SocketServerInfoMessage} from "./models/SocketServerTransmitMessage";
+import ConfigManager from "./ConfigManager";
 
-const heartbeatExpected = process.env.EXPECT_HEARTBEAT_EVERY_SECONDS ? parseInt(process.env.EXPECT_HEARTBEAT_EVERY_SECONDS) : 10;
+const heartbeatExpected = 10;
 
 type Listener = (payload: SocketServerTransmitMessage) => any;
 type ListenerPool = {[key: string]: Listener};
 /**
  * This class initializes a connection to our main bus arduino.
  */
-class Arduino {
+export default class Arduino {
 
   // Arduino Connection Info
   private serial: SerialPort;
@@ -20,17 +21,17 @@ class Arduino {
   private buffer: Buffer = Buffer.from("");
 
   // Heartbeat information
-  private heartbeatTimeout: NodeJS.Timeout;
+  private heartbeatTimeout: NodeJS.Timeout | undefined;
   private healthy: boolean = false;
   private lastHeartbeat: Date | null = null;
 
   // Listener information
   private listeners: ListenerPool = {};
 
-  constructor() {
+  constructor(config: ConfigManager) {
     // Initialize connection info
-    this.port = process.env.SERIAL_PORT ?? "";
-    this.baud = process.env.SERIAL_BAUD ? parseInt(process.env.SERIAL_BAUD) : 9600;
+    this.port = config.getConfig().arduino_data_serialport;
+    this.baud = config.getConfig().arduino_data_baud;
 
     // Setup serial
     this.serial = new SerialPort(this.port, {
@@ -38,6 +39,49 @@ class Arduino {
       autoOpen: false,
     });
 
+    // Finish setup
+    this.setupSerial();
+  }
+
+  /**
+   * Restart the serial connection with potentially new parameters
+   * @param config Config to use
+   */
+  public restart(config: ConfigManager) {
+    // Close current connection (if open)
+    this.closeConnection();
+
+    // Open new connection
+    this.port = config.getConfig().arduino_data_serialport;
+    this.baud = config.getConfig().arduino_data_baud;
+
+    // Setup serial
+    this.serial = new SerialPort(this.port, {
+      baudRate: this.baud,
+      autoOpen: false,
+    });
+
+    // Finish setup
+    this.setupSerial();
+  }
+
+  /**
+   * Close current serial connection
+   * @private
+   */
+  private closeConnection() {
+    // Close current connection
+    if(this.serial && this.serial.isOpen) this.serial.close();
+
+    // Clear heartbeat timeout
+    clearTimeout(this.heartbeatTimeout);
+  }
+
+  /**
+   * Finish setting up the serial connection
+   * @private
+   */
+  private setupSerial() {
     // Setup Connection Event
     this.serial.on('open', () => {
       console.log(`✅ Successfully arduino controller on '${this.port}' at ${this.baud} baud`);
@@ -51,17 +95,20 @@ class Arduino {
     }
 
     // Setup initial heartbeat timeout
-    this.heartbeatTimeout = setTimeout(() => {this.healthy = false}, heartbeatExpected * 1000);
+    this.heartbeatTimeout = setTimeout(() => this.unhealthy(), heartbeatExpected * 1000);
 
     // Setup Serial listener
-    this.serial.on("data", (data) => this.onData(data))
+    this.serial.on("data", d => this.onData(d))
+
+    // Setup Serial closed listener
+    this.serial.on("close", () => this.unhealthy())
   }
 
   /**
    * Get if the arduino connection is healthy
    */
   public isHealthy(): boolean {
-    return this.healthy;
+    return this.healthy && this.serial.isOpen;
   }
 
   /**
@@ -172,9 +219,9 @@ class Arduino {
    * Mark arduino as unhealthy
    */
   private unhealthy() {
-    this.healthy = false;
-    this.emitToListeners({type: "unhealthy", last_heartbeat: this.lastHeartbeat})
+    if(this.healthy) {
+      this.healthy = false;
+      this.emitToListeners({type: "unhealthy", last_heartbeat: this.lastHeartbeat})
+    }
   }
 }
-
-export default Arduino;

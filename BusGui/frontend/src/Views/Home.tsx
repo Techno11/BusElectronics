@@ -22,7 +22,15 @@ const Home = ({setCurrentView}: IProps) => {
      <>
        {/* Title*/}
        <Box sx={{textAlign: "center"}}>
-         <Typography variant={"h4"}>BSOD the Bus Control Center</Typography>
+         <Typography variant={"h4"} sx={{display: "inline"}}>BSOD the </Typography>
+         <Typography
+           variant={"h4"}
+           sx={{display: "inline"}}
+           onClick={() => setCurrentView(Views.Settings)}
+         >
+           Bus
+         </Typography>
+         <Typography variant={"h4"} sx={{display: "inline"}}> Control Center</Typography>
        </Box>
 
        {/* Lights/Dashboard Buttons */}

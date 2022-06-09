@@ -51,6 +51,9 @@
  * 01 => 16 - Water Flow Rate
  */
 
+/* VERSION */
+#define VERSION 1
+
 /* Water Pump State */
 #define WATER_PUMP_AUTO 0
 #define WATER_PUMP_MANUAL 1
@@ -167,7 +170,7 @@ void setup() {
   Serial.begin(115200);
 
   // Communication to pi
-  // Serial1.begin(115200);
+  Serial1.begin(115200);
 
   // Setup Flow Sensor Inturrupt
   pinMode(WATER_FLOW_PIN, INPUT);
@@ -358,74 +361,76 @@ void processLeds(int fixture, int red, int green, int blue) {
 
 // Pseudo-json
 void sendStatus() {
-  Serial.print("{\"water_percent\":");
-  Serial.print(currentWaterPercent);
-  Serial.print(",\"current\":");
-  Serial.print(currentCurrent);
-  Serial.print(",\"propane_0\":");
-  Serial.print(currentPropanePressure[0]);
-  Serial.print(",\"propane_1\":");
-  Serial.print(currentPropanePressure[1]);
-  Serial.print(",\"shore_water_pressure\":");
-  Serial.print(currentWaterPressure);
-  Serial.print(",\"water_pump_run_state\":");
-  Serial.print(waterPumpRunState);
-  Serial.print(",\"water_flow\":");
-  Serial.print(currentWaterFlow);-
-  Serial.print(",\"digital_inputs\":[");
-  Serial.print(lastButtonReads[0]);
-  Serial.print(",");
-  Serial.print(lastButtonReads[1]);
-  Serial.print(",");
-  Serial.print(lastButtonReads[2]);
-  Serial.print(",");
-  Serial.print(lastButtonReads[3]);
-  Serial.print(",");
-  Serial.print(lastButtonReads[4]);
-  Serial.print(",");
-  Serial.print(lastButtonReads[5]);
-  Serial.print(",");
-  Serial.print(lastButtonReads[6]);
-  Serial.print(",");
-  Serial.print(lastButtonReads[7]);
-  Serial.print("],\"relays\":[");
-  Serial.print(relayStates[0]);
-  Serial.print(",");
-  Serial.print(relayStates[1]);
-  Serial.print(",");
-  Serial.print(relayStates[2]);
-  Serial.print(",");
-  Serial.print(relayStates[3]);
-  Serial.print(",");
-  Serial.print(relayStates[4]);
-  Serial.print(",");
-  Serial.print(relayStates[5]);
-  Serial.print(",");
-  Serial.print(relayStates[6]);
-  Serial.print(",");
-  Serial.print(relayStates[7]);
-  Serial.print("],\"dimmers\":[");
-  Serial.print(dimmerAnimations[0][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[1][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[2][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[3][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[4][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[5][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[6][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[7][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[8][CURRENT_BRIGHTNESS]);
-  Serial.print(",");
-  Serial.print(dimmerAnimations[9][CURRENT_BRIGHTNESS]);
-  Serial.print("]}");
-  Serial.print("\n"); // Tells Pi that we're done
+  Serial1.print("{\"water_percent\":");
+  Serial1.print(currentWaterPercent);
+  Serial1.print(",\"version\":");
+  Serial1.print(VERSION);
+  Serial1.print(",\"current\":");
+  Serial1.print(currentCurrent);
+  Serial1.print(",\"propane_0\":");
+  Serial1.print(currentPropanePressure[0]);
+  Serial1.print(",\"propane_1\":");
+  Serial1.print(currentPropanePressure[1]);
+  Serial1.print(",\"shore_water_pressure\":");
+  Serial1.print(currentWaterPressure);
+  Serial1.print(",\"water_pump_run_state\":");
+  Serial1.print(waterPumpRunState);
+  Serial1.print(",\"water_flow\":");
+  Serial1.print(currentWaterFlow);-
+  Serial1.print(",\"digital_inputs\":[");
+  Serial1.print(lastButtonReads[0]);
+  Serial1.print(",");
+  Serial1.print(lastButtonReads[1]);
+  Serial1.print(",");
+  Serial1.print(lastButtonReads[2]);
+  Serial1.print(",");
+  Serial1.print(lastButtonReads[3]);
+  Serial1.print(",");
+  Serial1.print(lastButtonReads[4]);
+  Serial1.print(",");
+  Serial1.print(lastButtonReads[5]);
+  Serial1.print(",");
+  Serial1.print(lastButtonReads[6]);
+  Serial1.print(",");
+  Serial1.print(lastButtonReads[7]);
+  Serial1.print("],\"relays\":[");
+  Serial1.print(relayStates[0]);
+  Serial1.print(",");
+  Serial1.print(relayStates[1]);
+  Serial1.print(",");
+  Serial1.print(relayStates[2]);
+  Serial1.print(",");
+  Serial1.print(relayStates[3]);
+  Serial1.print(",");
+  Serial1.print(relayStates[4]);
+  Serial1.print(",");
+  Serial1.print(relayStates[5]);
+  Serial1.print(",");
+  Serial1.print(relayStates[6]);
+  Serial1.print(",");
+  Serial1.print(relayStates[7]);
+  Serial1.print("],\"dimmers\":[");
+  Serial1.print(dimmerAnimations[0][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[1][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[2][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[3][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[4][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[5][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[6][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[7][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[8][CURRENT_BRIGHTNESS]);
+  Serial1.print(",");
+  Serial1.print(dimmerAnimations[9][CURRENT_BRIGHTNESS]);
+  Serial1.print("]}");
+  Serial1.print("\n"); // Tells Pi that we're done
 }
 
 // Method to setup animations

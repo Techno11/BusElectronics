@@ -5,7 +5,8 @@ enum Views {
   MainPresets,
   EntryPresets,
   DriverPresets,
-  BedroomPresets
+  BedroomPresets,
+  Settings
 }
 
 export default Views;

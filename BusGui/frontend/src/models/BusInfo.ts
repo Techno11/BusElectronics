@@ -1,5 +1,6 @@
 type BusInfo = {
   water_percent: number, // percent
+  version: number,
   propane_0: number, // psi
   propane_1: number, // psi
   shore_water_pressure: number, // psi

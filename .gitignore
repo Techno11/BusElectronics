@@ -5,3 +5,4 @@ build/
 BusGui/backend/public/*
 bin/
 BusGui/backend/out/
+*.hex
