@@ -143,6 +143,7 @@ export default class Arduino {
   private onData(data: Buffer) {
     // If we get a newline (\n)
     if(data.indexOf(0x0d) > -1) {
+      this.buffer = Buffer.concat([this.buffer, data]);
       this.dataDone();
     } else {
       this.buffer = Buffer.concat([this.buffer, data]);
