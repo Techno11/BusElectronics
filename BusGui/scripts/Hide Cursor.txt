@@ -1,0 +1,11 @@
+To Hide Cursor:
+
+sudo nano /etc/lightdm/lightdm.conf
+
+Find line
+
+xserver-command = 
+
+Replace 
+
+xserver-command = X -nocursory
