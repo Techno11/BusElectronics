@@ -1,0 +1,3 @@
+[Desktop Entry]
+Name=BusGuiKiosk
+Exec=/bin/bash /home/bus/kiosk.sh

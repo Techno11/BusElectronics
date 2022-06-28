@@ -120,10 +120,13 @@ const int inputPins[NUM_INPUTS] = {1, 0, 16, 17, 18, 19, 20, 21};
 #define NUM_LEDS_1 120
 #define NUM_LEDS_2 120
 #define NUM_LEDS_3 120
-#define NUM_LEDS_0_PASS 60
-#define NUM_LEDS_0_REAR 60
+#define NUM_LEDS_0_PASS 35
+#define NUM_LEDS_0_REAR 85
 const int ledCount[NUM_LED_STRIPS] = {NUM_LEDS_0, NUM_LEDS_1, NUM_LEDS_2, NUM_LEDS_3};
-CRGB ledStrips[][NUM_LED_STRIPS] = {new CRGB[NUM_LEDS_0], new CRGB[NUM_LEDS_1], new CRGB[NUM_LEDS_2], new CRGB[NUM_LEDS_3]};
+CRGB leds0[NUM_LEDS_0];
+CRGB leds1[NUM_LEDS_1];
+CRGB leds2[NUM_LEDS_2];
+CRGB leds3[NUM_LEDS_3];
 
 // Dimmer Animations
 // Each dimmer is has a corresponding "animation" (for fading) in this array.
@@ -161,10 +164,10 @@ void setup() {
   // Initilize Relay pins
   for(int i = 0; i < NUM_RELAYS; i++) { pinMode(relayPins[i], OUTPUT); setRelay(i, true);}
   // Initlize LEDS
-  FastLED.addLeds<NEOPIXEL, LED_PIN_0>(ledStrips[0], ledCount[0]);
-  FastLED.addLeds<NEOPIXEL, LED_PIN_1>(ledStrips[1], ledCount[1]);
-  FastLED.addLeds<NEOPIXEL, LED_PIN_2>(ledStrips[2], ledCount[2]);
-  FastLED.addLeds<NEOPIXEL, LED_PIN_3>(ledStrips[3], ledCount[3]);
+  FastLED.addLeds<WS2811, LED_PIN_0, BRG>(leds0, ledCount[0]);
+  FastLED.addLeds<WS2811, LED_PIN_1, BRG>(leds1, ledCount[1]);
+  FastLED.addLeds<WS2811, LED_PIN_2, BRG>(leds2, ledCount[2]);
+  FastLED.addLeds<WS2811, LED_PIN_3, BRG>(leds3, ledCount[3]);
 
   // Serial Debugging
   Serial.begin(115200);
@@ -176,10 +179,9 @@ void setup() {
   pinMode(WATER_FLOW_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(WATER_FLOW_PIN), measureFlow, RISING); 
 
-
   // Setup animations
-  setupAnimation(FRONT_AISLE_DIMMER, 255, .25);
-  setupAnimation(REAR_AISLE_DIMMER, 255, .25);
+  setupAnimation(FRONT_AISLE_DIMMER, 255, 2);
+  setupAnimation(REAR_AISLE_DIMMER, 255, 2);
 
   // Setup ADS (for current sensor)
   ads.setGain(GAIN_FOUR);      // +/- 1.024V 1bit = 0.5mV
@@ -270,11 +272,6 @@ void readDIO() {
         }
       }
   }
-  for (int i = 0; i < NUM_LED_STRIPS; i++) {
-    for(int j = 0; j < ledCount[i]; j++) {
-      ledStrips[i][j] = CRGB::White;
-    }
-  }
 }
 
 /* Serial bits for a "command" are in this order:
@@ -294,27 +291,32 @@ void readDIO() {
 void doSerial() {
   while (Serial3.available() > 0){
     // Create a place to hold the incoming command
-    static int command[6] = {0, 0, 0, 0, 0, 0};
+    static int command[7] = {0, 0, 0, 0, 0, 0, 0};
     static unsigned int commandPos = 0; 
 
     // Read the next available byte in the serial receive buffer
     char inByte = Serial3.read();
 
     // Message coming in (check not terminating character) and guard for over message size
-    if ( inByte != '\n' && (commandPos < 6) ){
+    if ( inByte != '\n' && (commandPos < 7) ){
       
       // Add the incoming byte to our command
       command[commandPos] = inByte;
       commandPos++;
     } else {
       // Start processing command
-      if(command[0] == 0) {           // "Intensity" Command
+      int fixture = command[2];
+      int mode = command[0];
+      boolean on = command[3] == 1;
+      if(mode == 0) {         // "Intensity" Command
+        // If "on" we want the requested intensity, otherwise we set 0 for off
+        int desired = on ? command[4] : 0;
         // Command desired fixture to go to desired intensity immediately
-        setupAnimation(command[2], command[4], 255);
-      } else if (command[0] == 1) {   // "Color" Command
-        processLeds(command[2], command[4], command[5], command[6]);
-      } else if (command[0] == 1) {   // "Relay" Command
-        processRelay(command[2], command[3], command[4]);
+        setupAnimation(fixture, desired, 0);
+      } else if (mode == 1) {   // "Color" Command
+        processLeds(fixture, command[4], command[5], command[6], on);
+      } else if (mode == 2) {   // "Relay" Command
+        processRelay(fixture, on, command[4]);
       }
 
       //Reset for the next message
@@ -324,7 +326,7 @@ void doSerial() {
 }
 
 // Process a relay command
-void processRelay(int fixture, int toggle, int ctrlMode) {
+void processRelay(int fixture, boolean on, int ctrlMode) {
   if(fixture == WATER_PUMP_RELAY){
     if(ctrlMode == RELAY_CTRL_AUTO) {
       // We're commanding automatic control, if pressure is above threshold, enable relay
@@ -333,28 +335,30 @@ void processRelay(int fixture, int toggle, int ctrlMode) {
       waterPumpRunState = WATER_PUMP_AUTO;
     } else {
       // We're commanding manual control, if toggle is 1 (on) then enable relay
-      setRelay(WATER_PUMP_RELAY, toggle == 1);
+      setRelay(WATER_PUMP_RELAY, on);
       // Set control state
       waterPumpRunState = WATER_PUMP_MANUAL;
     }
   } else {
-    setRelay(fixture, toggle == 1);
+    setRelay(fixture, on);
   }
 }
 
 // Process a LED command
-void processLeds(int fixture, int red, int green, int blue) {
-  if(fixture > 1 && fixture < 4) {
+void processLeds(int fixture, int red, int green, int blue, boolean on) {
+  CRGB color = on ? CRGB(red, green, blue) : CRGB(0, 0, 0);
+  if(fixture > 0 && fixture < 4) {
+    CRGB leds[ledCount[fixture]] = fixture == 1 ? leds1 : fixture == 2 ? leds2 : leds3;
     for(int i = 0; i < ledCount[fixture]; i++) {
-      ledStrips[fixture][i] = CRGB(red, green, blue);
+      leds[i] = color;
     }
   } else if(fixture == 0) { // First n leds are for passenger
     for(int i = 0; i < NUM_LEDS_0_PASS; i++) {
-      ledStrips[0][i] = CRGB(red, green, blue);
+      leds0[i] = color;
     }
   } else if(fixture == 4) { // Second n leds are for rear
     for(int i = NUM_LEDS_0_PASS; i < NUM_LEDS_0_PASS + NUM_LEDS_0_REAR; i++) {
-      ledStrips[0][i] = CRGB(red, green, blue);
+      leds0[i] = color;
     }
   }
 }
@@ -436,11 +440,20 @@ void sendStatus() {
 
 // Method to setup animations
 void setupAnimation(int i, int desired, float animationSpeed) {
+  
+  // If we're requesting the brightness that is currently set, ignore
+  if(desired == dimmerAnimations[i][CURRENT_BRIGHTNESS]) return;
+  
+  // If animation speed is 0, instantly set brightness
+  if (animationSpeed == 0) {
+    analogWrite(dimmerPins[i], desired);
+    dimmerAnimations[i][CURRENT_BRIGHTNESS] = desired;
   // If we're lowering the brightness, but the animation speed is positive, we need to undo that
-  if(dimmerAnimations[i][CURRENT_BRIGHTNESS] > desired && animationSpeed > 0) {
+  } else if(desired < dimmerAnimations[i][CURRENT_BRIGHTNESS] && animationSpeed > 0) {
     animationSpeed = -animationSpeed;
   }
 
+  // Update state
   dimmerAnimations[i][DESIRED_BRIGHTNESS] = desired;
   dimmerAnimations[i][ANIMATION_STEPS] = animationSpeed;
 }
@@ -456,13 +469,13 @@ void runAnimations() {
     delta = abs(dimmerAnimations[i][CURRENT_BRIGHTNESS] - dimmerAnimations[i][DESIRED_BRIGHTNESS]);
     
     // If the difference of the current and the desired is more than 1 step away
-    if(delta >= dimmerAnimations[i][ANIMATION_STEPS]) {
+    if(delta > dimmerAnimations[i][ANIMATION_STEPS]) {
       float newBrightness = dimmerAnimations[i][CURRENT_BRIGHTNESS] + dimmerAnimations[i][ANIMATION_STEPS];
       analogWrite(dimmerPins[i], (int)newBrightness);
       dimmerAnimations[i][CURRENT_BRIGHTNESS] = newBrightness;
     
     // If delta is less than a step, just go there
-    } else if (delta < dimmerAnimations[i][ANIMATION_STEPS]) {
+    } else if (delta <= dimmerAnimations[i][ANIMATION_STEPS]) {
       analogWrite(dimmerPins[i], dimmerAnimations[i][DESIRED_BRIGHTNESS]);
       dimmerAnimations[i][CURRENT_BRIGHTNESS] = dimmerAnimations[i][DESIRED_BRIGHTNESS];
     }
@@ -471,26 +484,25 @@ void runAnimations() {
 
 
 float sum = 0;
-long time_check = millis();
 int counter = 0;
+long lastCurrentCheck = millis();
 
 // Method to read the Current Sensor and get current AC Draw
 void readCurrent() {
   float voltage;
   float current;
 
-  if (millis() - time_check < 1000) {
+  if (millis() - lastCurrentCheck < 1000) {
     voltage = ads.readADC_Differential_0_1() * CS_MULTIPLIER;
     current = voltage * CS_FACTOR;
-    // current /= 1000.0;
 
     sum += sq(current);
     counter = counter + 1;
   } else {
     currentCurrent = sqrt(sum / counter);
     sum = 0;
-    time_check = millis();
     counter = 0;
+    lastCurrentCheck = millis();
   }
 }
 
