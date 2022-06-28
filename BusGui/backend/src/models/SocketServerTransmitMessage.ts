@@ -2,6 +2,8 @@ import BusInfo from "./BusInfo";
 
 type SocketServerHealthMessage = {
   type: "healthy" | "unhealthy",
+  software_healthy: boolean,
+  serial_healthy: boolean,
   last_heartbeat: Date | null,
 }
 

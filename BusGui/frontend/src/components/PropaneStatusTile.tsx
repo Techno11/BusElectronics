@@ -1,5 +1,5 @@
 import {Box, Typography} from "@mui/material";
-import {makeRelayCommand, RelayFixtures} from "../models/Command";
+import {CommandType, Device, makeRelayCommand, RelayFixtures} from "../models/Command";
 import React from "react";
 import BusInfo from "../models/BusInfo";
 import {useBus} from "../data/hooks/useSocket";
@@ -21,6 +21,20 @@ const PropaneStatusTile = ({data}: IProps) => {
   const [showDialog, setShowDialog] = useState<boolean>(false);
 
   useEffect(() => {
+    bus.addListener("PropaneStatusTile", data => {
+      if(data.type === "command") {
+        // Shorthand
+        const c = data.command;
+
+        // If we get any kind of propane-relay control command, set loading to true
+        if(c.device === Device.RELAY && c.type === CommandType.Relay && c.fixture === RelayFixtures.PropaneValve) {
+          setLoadingPropane(true);
+        }
+      }
+    });
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
     // Reset loading propane/pump
     setLoadingPropane(false);
   }, [data]); // eslint-disable-line
@@ -35,6 +49,9 @@ const PropaneStatusTile = ({data}: IProps) => {
     });
   }
 
+  const calcColor = (loading: boolean) =>
+    !data.relays || loading ? "grey.A700" : !data.relays[RelayFixtures.PropaneValve] ? "error.main" : ""
+
   return (
     <>
       <Box
@@ -46,25 +63,22 @@ const PropaneStatusTile = ({data}: IProps) => {
             ended = true;
             setShowDialog(true);
           }, 250);
-          e.target.addEventListener("touchend", (e) => {
+          e.target.addEventListener("touchend", () => {
             if (ended) return;
             clearTimeout(timeout);
+            e.target.removeEventListener("touchend", () => {});
           });
         }}
       >
-        <Typography
-          variant={"h4"}
-          color={!data.relays || loadingPropane ? "warning.main" : !data.relays[RelayFixtures.PropaneValve] ? "error.main" : ""}
-        >
-          {data.propane_0 ?? "---"} psi
+        <Typography display={"inline"} variant={"h4"} color={calcColor(loadingPropane)}>
+          {data.propane_0 ?? "---"}
         </Typography>
-        <Typography variant={"caption"}>Propane Tanks</Typography>
-        <Typography
-          variant={"h4"}
-          color={!data.relays || loadingPropane ? "warning.main" : !data.relays[RelayFixtures.PropaneValve] ? "error.main" : ""}
-        >
-          {data.propane_1 ?? "---"} psi
+        <Typography display={"inline"} variant={"h6"} color={calcColor(loadingPropane)}>{" psi"}</Typography>
+        <Typography variant={"caption"} display={"flex"}>Propane Tanks</Typography>
+        <Typography display={"inline"}variant={"h4"} color={calcColor(loadingPropane)}>
+          {data.propane_1 ?? "---"}
         </Typography>
+        <Typography variant={"h6"} display={"inline"} color={calcColor(loadingPropane)}>{" psi"}</Typography>
       </Box>
 
       {/* Toggle Dialog */}

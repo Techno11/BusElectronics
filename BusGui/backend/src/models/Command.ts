@@ -1,5 +1,3 @@
-import {type} from "os";
-
 type Command = ColorCommand | IntensityCommand | RelayCommand;
 
 type CommandBase = {
@@ -12,7 +10,8 @@ type ColorCommand = {
   type: CommandType.Color,
   red: number,
   green: number,
-  blue: number
+  blue: number,
+  alpha: number,
 } & CommandBase
 
 type RelayCommand = {
@@ -121,8 +120,8 @@ const validateCommand = (data: Command) => {
   } else if (data.type === CommandType.Relay) {
     return (
       typeof data.state === "number" &&
-      data.state <= 0 &&
-      data.state < 2
+      data.state >= 0 &&
+      data.state <= 1
     )
   } else {
     return false;
@@ -141,12 +140,20 @@ const formatCommand = (command: Command): number[] => {
   // Command string base
   let commandArr = [command.type, command.device, command.fixture, command.on ? 1 : 0];
   if(command.type === CommandType.Intensity) {
-    commandArr.push(command.intensity);
+    // Nothing can equal 10
+    if (Math.floor(command.intensity) === 10) command.intensity = 11;
+    commandArr.push(Math.floor(command.intensity));
   } else if (command.type === CommandType.Color) {
-    commandArr.push(command.red, command.green, command.blue);
+    // Nothing can equal 10
+    if(Math.floor(command.red) === 10) command.red = 11;
+    if(Math.floor(command.green) === 10) command.green = 11;
+    if(Math.floor(command.blue) === 10) command.blue = 11;
+    commandArr.push(Math.floor(command.red), Math.floor(command.green), Math.floor(command.blue));
   } else if (command.type === CommandType.Relay) {
     commandArr.push(command.state);
   }
+  // \n triggers the "go" on the arduino or end-of-command  
+  commandArr.push(10); // 10 == \n
   return commandArr;
 }
 

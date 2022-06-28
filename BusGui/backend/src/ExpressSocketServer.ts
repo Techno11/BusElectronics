@@ -82,7 +82,6 @@ class ExpressSocketServer {
           res.status(400).send({success: false, error: 'Bad Request', route: req.path, method: req.method});
         }
       } catch(e) {
-        console.log(e);
         if(!res.headersSent) {
           res.status(500).send({success: false, error: e, route: req.path, method: req.method});
         }

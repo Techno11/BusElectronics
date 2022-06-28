@@ -21,12 +21,14 @@ export default function App() {
   const [currentView, setCurrentView] = useState<Views>(Views.Home);
   const [busData, setBusData] = useState<BusInfo>({} as BusInfo);
   const [connectedSocket, setConnectedSocket] = useState<boolean>(false);
-  const [connectedArduino, setConnectedArduino] = useState<boolean>(false);
+  const [healthyHardware, setHealthyHardware] = useState<boolean>(false);
+  const [healthySoftware, setHealthySoftware] = useState<boolean>(false);
 
   useEffect(() => {
     // Request status
     bus.getStatus().then(data => {
-      setConnectedArduino(data.healthy);
+      setHealthyHardware(data.serial_healthy);
+      setHealthySoftware(data.software_healthy);
     });
 
     // Get socket connection status
@@ -36,8 +38,10 @@ export default function App() {
     bus.addListener("app", payload => {
       if(payload.type === "info" && payload.data) setBusData(payload.data);
       else if (payload.type === "socket") setConnectedSocket(payload.connected);
-      else if (payload.type === "healthy") setConnectedArduino(true);
-      else if (payload.type === "unhealthy") setConnectedArduino(false);
+      else if (payload.type === "healthy" || payload.type === "unhealthy") {
+        setHealthyHardware(payload.serial_healthy);
+        setHealthySoftware(payload.software_healthy);
+      }
     });
 
     // Load view based on URL location
@@ -102,9 +106,12 @@ export default function App() {
   return (
     <Container sx={{width: "100vw", height: "95vh", m: 0, p: 0}}>
       {/* Socket or Arduino connection error */}
-      {(!connectedArduino || !connectedSocket) &&
+      {(!healthyHardware || !healthySoftware || !connectedSocket) &&
         <Box sx={{width: "100vw", background: "darkred", position: "absolute", top: 0, left: 0, textAlign: "center"}}>
-          {!connectedSocket ? "Socket Connection Error" : "Mainframe Connection Error"}
+          {!connectedSocket ? "Socket Connection Error" :
+            !healthyHardware ? "Mainframe Connection Error" :
+              "Mainframe Heartbeat Lost"
+          }
         </Box>
       }
 

@@ -1,8 +1,9 @@
 import React from "react";
 import {Box, Grid, Slider, Typography} from "@mui/material";
 import FadableLightIcon from "../components/FadableLightIcon";
-import {useState} from "preact/hooks";
+import {useEffect, useRef, useState} from "preact/hooks";
 import {
+  CommandType,
   Device,
   getName,
   LEDFixtures,
@@ -32,6 +33,41 @@ const LightControl = () => {
   const [leds, setLeds] = useState<LEDColor[]>([newLED(), newLED(), newLED(), newLED(), newLED()]);
   const [currentFixture, setCurrentFixture] = useState<MosfetFixtures | LEDFixtures>(MosfetFixtures.RearAisle);
   const [currentDevice, setCurrentDevice] = useState<Device.LED | Device.MOSFET>(Device.MOSFET);
+
+  // Refs
+  const mosfetRef = useRef<Mosfet[]>(mosfets);
+  const ledRef = useRef<LEDColor[]>(leds);
+
+  // Start listening to bus
+  useEffect(() => {
+    bus.addListener("LightControl", data => {
+      if(data.type === "command") {
+        // Shorthand
+        const c = data.command;
+
+        // Decode command
+        if(c.device === Device.MOSFET && c.type === CommandType.Intensity) {
+          const fets = [...mosfetRef.current];
+          fets[c.fixture] = {i: c.intensity / 255, on: c.on};
+          updateFetState(fets);
+        } else if (c.device === Device.LED && c.type === CommandType.Color) {
+          const led = [...ledRef.current];
+          led[c.fixture] = {on: c.on, a: c.alpha, r: c.red / c.alpha, g: c.green / c.alpha, b: c.blue / c.alpha}
+          updateLedState(led);
+        }
+      }
+    });
+  }, []); // eslint-disable-line
+
+  const updateFetState = (fets: Mosfet[]) => {
+    mosfetRef.current = fets;
+    setMosfets(fets);
+  }
+
+  const updateLedState = (led: LEDColor[]) => {
+    ledRef.current = led;
+    setLeds(led);
+  }
 
   const selectLight = (fixture: MosfetFixtures) => {
     // Check if this fixture is already selected, if so, toggle it
@@ -78,7 +114,7 @@ const LightControl = () => {
     const copy = [...mosfets];
     copy[selFix].i = val;
     copy[selFix].on = true;
-    setMosfets(copy);
+    updateFetState(copy);
     bus.runCommand(makeMosfetCommand(currentDevice, selFix, copy[selFix]));
   }
 
@@ -86,7 +122,7 @@ const LightControl = () => {
   const toggleMosfetFixture = (val: boolean, selFix: MosfetFixtures | LEDFixtures) => {
     const copy = [...mosfets];
     copy[selFix].on = !val;
-    setMosfets(copy);
+    updateFetState(copy);
     bus.runCommand(makeMosfetCommand(currentDevice, selFix, copy[selFix]));
   }
 
@@ -94,7 +130,7 @@ const LightControl = () => {
   const updateLeds = (color: ColorResult, selFix: MosfetFixtures | LEDFixtures) => {
     const copy = [...leds];
     copy[selFix] = {...color.rgb, on: true} as LEDColor;
-    setLeds(copy)
+    updateLedState(copy)
     bus.runCommand(makeLedCommand(currentDevice, selFix, copy[selFix]));
   }
 
@@ -102,7 +138,7 @@ const LightControl = () => {
   const toggleLeds = (val: boolean, selFix: MosfetFixtures | LEDFixtures) => {
     const copy = [...leds];
     copy[selFix].on = !val;
-    setLeds(copy)
+    updateLedState(copy)
     bus.runCommand(makeLedCommand(currentDevice, selFix, copy[selFix]));
   }
 

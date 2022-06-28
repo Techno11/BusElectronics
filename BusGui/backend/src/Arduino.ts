@@ -2,11 +2,12 @@ import SerialPort from "serialport";
 import Command, {formatCommand, validateCommand} from "./models/Command";
 import SocketServerTransmitMessage, {SocketServerInfoMessage} from "./models/SocketServerTransmitMessage";
 import ConfigManager from "./ConfigManager";
+import {clearTimeout} from "timers";
 
 const heartbeatExpected = 10;
 
 type Listener = (payload: SocketServerTransmitMessage) => any;
-type ListenerPool = {[key: string]: Listener};
+type ListenerPool = { [key: string]: Listener };
 /**
  * This class initializes a connection to our main bus arduino.
  */
@@ -24,6 +25,10 @@ export default class Arduino {
   private heartbeatTimeout: NodeJS.Timeout | undefined;
   private healthy: boolean = false;
   private lastHeartbeat: Date | null = null;
+
+  // State
+  private connectionFailedTimeout: NodeJS.Timeout | undefined;
+  private connected: boolean = false;
 
   // Listener information
   private listeners: ListenerPool = {};
@@ -71,7 +76,8 @@ export default class Arduino {
    */
   private closeConnection() {
     // Close current connection
-    if(this.serial && this.serial.isOpen) this.serial.close();
+    if (this.serial && this.serial.isOpen) this.serial.close();
+    if (this.serial) this.serial.destroy();
 
     // Clear heartbeat timeout
     clearTimeout(this.heartbeatTimeout);
@@ -84,31 +90,53 @@ export default class Arduino {
   private setupSerial() {
     // Setup Connection Event
     this.serial.on('open', () => {
-      console.log(`✅ Successfully arduino controller on '${this.port}' at ${this.baud} baud`);
+      console.log(`✅ Successfully connected to arduino controller on '${this.port}' at ${this.baud} baud`);
+
+      // Set connected
+      this.connected = true;
+
+      // Remove connection failed timeout
+      if (this.connectionFailedTimeout) {
+        clearTimeout(this.connectionFailedTimeout);
+        this.connectionFailedTimeout = undefined;
+      }
     })
 
     // Try Connecting
     try {
       this.serial.open();
     } catch {
-      console.log(`❌ Failed to connect to arduino controller on '${this.port}' at ${this.baud} baud`);
+      console.log(`❌ Failed to connect to arduino controller on '${this.port}' at ${this.baud} baud. Trying again in 1 second...`);
+
+      // Setup timeout to try and reconnect
+      this.connectionFailedTimeout = setTimeout(() => this.setupSerial(), 1000);
     }
 
     // Setup initial heartbeat timeout
     this.heartbeatTimeout = setTimeout(() => this.unhealthy(), heartbeatExpected * 1000);
 
     // Setup Serial listener
-    this.serial.on("data", d => this.onData(d))
+    this.serial.on("data", d => this.onData(d));
 
     // Setup Serial closed listener
-    this.serial.on("close", () => this.unhealthy())
+    this.serial.on("close", () => {
+      this.connected = false;
+      this.unhealthy()
+    });
   }
 
   /**
-   * Get if the arduino connection is healthy
+   * Get if the arduino software connection is healthy
    */
-  public isHealthy(): boolean {
-    return this.healthy && this.serial.isOpen;
+  public isSoftwareHealthy(): boolean {
+    return this.isSerialHealthy() && this.healthy;
+  }
+
+  /**
+   * Get if the arduino serial connection is healthy
+   */
+  public isSerialHealthy(): boolean {
+    return this.serial.isOpen && this.connected;
   }
 
   /**
@@ -132,7 +160,7 @@ export default class Arduino {
    * @param name name to remove
    */
   public removeListener(name: string) {
-    if(typeof this.listeners[name] !== "undefined") delete this.listeners[name];
+    if (typeof this.listeners[name] !== "undefined") delete this.listeners[name];
   }
 
   /**
@@ -142,10 +170,14 @@ export default class Arduino {
    */
   private onData(data: Buffer) {
     // If we get a newline (\n)
-    if(data.indexOf(0x0d) > -1) {
+    if (data.indexOf(0x0d) > -1) {
+      // Concat last bit of data
       this.buffer = Buffer.concat([this.buffer, data]);
+
+      // Trigger data done
       this.dataDone();
     } else {
+      // Just concat data
       this.buffer = Buffer.concat([this.buffer, data]);
     }
   }
@@ -158,19 +190,26 @@ export default class Arduino {
     try {
       // Messages from arduino are sent in json
       const parsed = JSON.parse(this.buffer.toString('utf8').trim());
+
       // Reset Buffer
       this.buffer = Buffer.from("");
+
       // Handle heartbeat
       this.handleHeartbeat();
+
       // Create message
       const msg: SocketServerInfoMessage = {type: "info", data: parsed};
+
       // Emit to our listeners
       this.emitToListeners(msg);
+
     } catch (err) {
       // Print invalid message
       console.log(`Invalid message from arduino: \n"${this.buffer.toString('utf8')}"`, err);
+
       // Reset Buffer
       this.buffer = Buffer.from("");
+
     }
   }
 
@@ -179,7 +218,7 @@ export default class Arduino {
    * @param command
    */
   public sendCommand(command: Command): boolean {
-    if(!validateCommand(command)) return false;
+    if (!validateCommand(command)) return false;
     this.serial.write(formatCommand(command));
     return true;
   }
@@ -195,9 +234,17 @@ export default class Arduino {
     // Update last heartbeat date
     this.lastHeartbeat = new Date();
     // If we are recovering from being unhealthy, emit that we're healthy again
-    if(!this.healthy) {
+    if (!this.healthy) {
+      // Mark Healthy
       this.healthy = true;
-      this.emitToListeners({type: "healthy", last_heartbeat: this.lastHeartbeat})
+
+      // Emit healthy state
+      this.emitToListeners({
+        type: "healthy",
+        last_heartbeat: this.lastHeartbeat,
+        serial_healthy: this.isSerialHealthy(),
+        software_healthy: this.isSoftwareHealthy()
+      })
     }
   }
 
@@ -208,7 +255,7 @@ export default class Arduino {
    */
   private emitToListeners(data: SocketServerTransmitMessage) {
     for (const key in this.listeners) {
-      try{
+      try {
         this.listeners[key](data);
       } catch {
         // Failed to emit, but we just don't want it to stop everything
@@ -220,9 +267,17 @@ export default class Arduino {
    * Mark arduino as unhealthy
    */
   private unhealthy() {
-    if(this.healthy) {
+    if (this.healthy) {
+      // Set state as unhealthy
       this.healthy = false;
-      this.emitToListeners({type: "unhealthy", last_heartbeat: this.lastHeartbeat})
+
+      // Emit unhealthy state
+      this.emitToListeners({
+        type: "unhealthy",
+        last_heartbeat: this.lastHeartbeat,
+        serial_healthy: this.isSerialHealthy(),
+        software_healthy: this.isSoftwareHealthy()
+      });
     }
   }
 }

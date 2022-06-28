@@ -14,7 +14,8 @@ type ColorCommand = {
   type: CommandType.Color,
   red: number,
   green: number,
-  blue: number
+  blue: number,
+  alpha: number,
 } & CommandBase
 
 type IntensityCommand = {
@@ -157,6 +158,7 @@ const makeLedCommand = (device: Device, fixture: Fixture, state: LEDColor): Comm
     red: Math.ceil(state.r * state.a),
     green: Math.ceil(state.g * state.a),
     blue: Math.ceil(state.b * state.a),
+    alpha: state.a, // for reproduction on other screens
   }
 }
 

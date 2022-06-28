@@ -1,6 +1,6 @@
 import {io, Socket} from "socket.io-client";
 import Command from "../../models/Command";
-import SocketMessage from "../../models/SocketMessage";
+import SocketMessage, {SocketMessageHeartbeat} from "../../models/SocketMessage";
 import Config, {SocketConfigResponse} from "../../models/Config";
 
 const rateLimit = 50; // how many MS to wait between sending requests to avoid spamming
@@ -20,6 +20,7 @@ export default class BusSocket {
     this._socket = io(path, {autoConnect: false});
     // Setup events
     this._socket.on("arduino-update", d => this._emitAll(d));
+    this._socket.on("command-executed", d => this._emitAll({type: "command", command: d}));
     this._socket.on("connect", () => this._emitAll({type: "socket", connected: true}));
     this._socket.on("disconnect", () => this._emitAll({type: "socket", connected: false}));
     this._socket.on("error", () => this._emitAll({type: "socket", connected: false}));
@@ -69,10 +70,15 @@ export default class BusSocket {
   /**
    * Get status
    */
-  public getStatus(): Promise<{healthy: boolean, last_heartbeat: Date}> {
+  public getStatus(): Promise<SocketMessageHeartbeat> {
     return new Promise(resolve => {
       this._socket.on("get-status-response", json => {
-        resolve({healthy: json.healthy, last_heartbeat: new Date(json.last_heartbeat)})
+        resolve({
+          type: "healthy",
+          serial_healthy: json.serial_healthy,
+          software_healthy: json.software_healthy,
+          last_heartbeat: new Date(json.last_heartbeat)
+        })
       })
       this._socket.emit("get-status");
     })

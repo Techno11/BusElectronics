@@ -44,9 +44,9 @@ io.on('connection', async (client: Socket) => {
     if(typeof command === "string") command = JSON.parse(command);
     const resp = arduino.sendCommand(command);
     client.emit("control-response", {success: resp})
+
     // Emit to rest of server that there has been an update
-    // TODO: Maybe??
-    // client.broadcast.emit("command-executed", command);
+    if(resp) client.broadcast.emit("command-executed", command);
   });
 
   client.on('get-config', () => {
@@ -60,7 +60,12 @@ io.on('connection', async (client: Socket) => {
   client.on('get-status', () => {
     client.emit(
       "get-status-response",
-      {success: true, healthy: arduino.isHealthy(), last_heartbeat: arduino.getLastHeartbeat()}
+      {
+        success: true,
+        serial_healthy: arduino.isSerialHealthy(),
+        software_healthy: arduino.isSoftwareHealthy(),
+        last_heartbeat: arduino.getLastHeartbeat()
+      }
     )
   });
 

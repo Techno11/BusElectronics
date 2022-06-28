@@ -13,7 +13,6 @@ const cellSxBase = {height: 1 / 3, display: "flex", alignItems: "center", justif
 
 const Dashboard = ({data}: IProps) => {
 
-
   return (
     <>
       <Grid container direction={"row"} sx={{height: "95vh"}}>
@@ -38,8 +37,9 @@ const Dashboard = ({data}: IProps) => {
 
           <Box sx={{...cellSxBase, textAlign: "center", userSelect: "none"}}>
             <Box>
-              <Typography variant={"h4"}>{data.current ?? "---"} amps</Typography>
-              <Typography variant={"caption"}>AC Load</Typography>
+              <Typography variant={"h4"} display={"inline"}>{data.current ?? "---"}</Typography>
+              <Typography variant={"h6"} display={"inline"}>{" amps"}</Typography>
+              <Typography variant={"caption"} display={"flex"}>AC Load</Typography>
             </Box>
           </Box>
         </Grid>
