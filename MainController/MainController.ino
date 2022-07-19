@@ -34,8 +34,8 @@
  * 02 => 46 - 
  * 03 => 47 - 
  ****** Digital Inputs ******
- * 00 => 1 - Shower Button
- * 01 => 0 - Closet Door Switches
+ * 00 => 01 - Shower Button
+ * 01 => 00 - Closet Door Switches
  * 02 => 16 - Emergency Window
  * 03 => 17 - Emergency Window
  * 04 => 18 - [Left 2nd-to-Bottom]
@@ -45,14 +45,17 @@
  * 
  ****** Analog Inputs ******
  * 00 => 15 - Main Water Tank Sensor
- * 01 => 16 - Propane Tank 1
- * 01 => 16 - Propane Tank 2
- * 01 => 16 - Shore Water Pressure
- * 01 => 16 - Water Flow Rate
+ * 01 => 14 - Propane Tank 1
+ * 02 => 13 - Propane Tank 2
+ * 03 => 12 - Shore Water Pressure
+ * 04 => 11 - AC Voltage
+ * 
+ ****** Digital Inturrupts ******
+ * 00 => 02 - Water Flow Rate
  */
 
 /* VERSION */
-#define VERSION 1
+#define VERSION 2
 
 /* Water Pump State */
 #define WATER_PUMP_AUTO 0
@@ -97,10 +100,11 @@ const int relayPins[NUM_RELAYS] = {26, 27, 28, 29, 30, 31, 32, 33};
 #define PROPANE_TANK_ONE 1
 #define PROPANE_TANK_TWO 2
 #define SHORE_WATER_PRESSURE 3
+#define AC_VOLTAGE 4
 
 /* Analog Pin-Map */
-#define NUM_ANALOG 4
-const int analogPins[NUM_ANALOG] = {15, 14, 13, 12};
+#define NUM_ANALOG 5
+const int analogPins[NUM_ANALOG] = {15, 14, 13, 12, 11};
 
 /* Digital Inputs */
 #define SHOWER_BUTTON 0
@@ -108,7 +112,6 @@ const int analogPins[NUM_ANALOG] = {15, 14, 13, 12};
 
 #define NUM_INPUTS 8
 const int inputPins[NUM_INPUTS] = {1, 0, 16, 17, 18, 19, 20, 21};
-
 
 // LED Config
 #define NUM_LED_STRIPS 4
@@ -131,6 +134,7 @@ CRGB leds3[NUM_LEDS_3];
 // Dimmer Animations
 // Each dimmer is has a corresponding "animation" (for fading) in this array.
 // The arrays are stored as follows: {currentBrightness, desiredBrightness, stepsToAnimate}
+// Shorthand Labels
 #define CURRENT_BRIGHTNESS 0
 #define DESIRED_BRIGHTNESS 1
 #define ANIMATION_STEPS 2
@@ -159,10 +163,13 @@ unsigned long flowLoopTime = millis();
 void setup() {
   // Initilize Sensor (Input) Pins
   for(int i = 0; i < NUM_INPUTS; i++) { pinMode(inputPins[i], INPUT_PULLUP); }
+  
   // Initilize Output (Dimmer) pins
   for(int i = 0; i < NUM_DIMMERS; i++) { pinMode(dimmerPins[i], OUTPUT); analogWrite(dimmerPins[i], 0);}
+  
   // Initilize Relay pins
   for(int i = 0; i < NUM_RELAYS; i++) { pinMode(relayPins[i], OUTPUT); setRelay(i, true);}
+  
   // Initlize LEDS
   FastLED.addLeds<WS2811, LED_PIN_0, BRG>(leds0, ledCount[0]);
   FastLED.addLeds<WS2811, LED_PIN_1, BRG>(leds1, ledCount[1]);
@@ -183,13 +190,14 @@ void setup() {
   setupAnimation(FRONT_AISLE_DIMMER, 255, 2);
   setupAnimation(REAR_AISLE_DIMMER, 255, 2);
 
-  // Setup ADS (for current sensor)
+  // Setup ADS (for AC current sensor)
   ads.setGain(GAIN_FOUR);      // +/- 1.024V 1bit = 0.5mV
   ads.begin();
 }
 
 // Sensor States
-float currentCurrent = 0.0; // amps
+float currentACCurrent = 0.0; // amps
+float currentACVoltage = 0.0; // AC volts
 float currentWaterPercent = 0.0; // percent
 float currentPropanePressure[2] = {0.0, 0.0}; // psi
 float currentWaterPressure = 0.0; // psi
@@ -370,7 +378,9 @@ void sendStatus() {
   Serial3.print(",\"version\":");
   Serial3.print(VERSION);
   Serial3.print(",\"current\":");
-  Serial3.print(currentCurrent);
+  Serial3.print(currentACCurrent);
+  Serial3.print(",\"ac_voltage\":");
+  Serial3.print(currentACVoltage);
   Serial3.print(",\"propane_0\":");
   Serial3.print(currentPropanePressure[0]);
   Serial3.print(",\"propane_1\":");
@@ -482,6 +492,11 @@ void runAnimations() {
   }
 }
 
+void readVoltage() {
+  int raw = analogRead(analogPins[AC_VOLTAGE]);
+  // Voltage is read as a percentage of 250vac
+  currentACVoltage = (raw / 1024) * 250;
+}
 
 float sum = 0;
 int counter = 0;
@@ -499,7 +514,7 @@ void readCurrent() {
     sum += sq(current);
     counter = counter + 1;
   } else {
-    currentCurrent = sqrt(sum / counter);
+    currentACCurrent = sqrt(sum / counter);
     sum = 0;
     counter = 0;
     lastCurrentCheck = millis();
