@@ -1,12 +1,13 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
-import Arduino from "./Arduino";
+import Arduino, {ConnectionType} from "./Arduino";
 import ExpressSocketServer from "./ExpressSocketServer";
 import {Socket} from "socket.io";
 import ConfigManager from "./ConfigManager";
 import serialport from "serialport";
 import Config from "./models/Config";
 import fs from "fs";
+
 const Avrgirl = require('avrgirl-arduino');
 
 // Setup dotenv
@@ -26,8 +27,16 @@ process.stdout.write('✅ HOST ')
 console.log('✅ env Check Passed. Starting Bus Backend v' + packageJson.version);
 
 const config = new ConfigManager();
-const arduino = new Arduino(config);
+const arduino = new Arduino(config, ConnectionType.data);
+const arduinoDebug = new Arduino(config, ConnectionType.debug);
 const io = new ExpressSocketServer().getIO();
+
+const startDebug = (): boolean => {
+  if(!arduinoDebug.isSerialHealthy()) {
+    arduinoDebug.restart(config, ConnectionType.debug)
+  }
+  return true;
+};
 
 // Setup Socket Connector
 io.on('connection', async (client: Socket) => {
@@ -69,6 +78,16 @@ io.on('connection', async (client: Socket) => {
     )
   });
 
+  client.on('start-debug', () => {
+    if(!arduinoDebug) {
+      client.emit('start-debug-response', {success: startDebug()});
+    }
+  });
+
+  client.on('debug-status', () => {
+    client.emit('debug-status-response', {success: true, status: arduinoDebug.isSerialHealthy()});
+  });
+
   client.on('restart', () => {
     process.exit(1);
   });
@@ -76,8 +95,13 @@ io.on('connection', async (client: Socket) => {
   client.on('update-config', ({key, val}: {key: keyof Config, val: any}) => {
     // Update config
     config.updateConfig(key, val);
+
     // If we're updating either property for the data arduino connection, restart the arduino connection
-    if(key === 'arduino_data_baud' || key === 'arduino_data_serialport')  arduino.restart(config);
+    if(key === 'arduino_data_baud' || key === 'arduino_data_serialport')  arduino.restart(config, ConnectionType.data);
+
+    // If we're updating the debug arduino connection (and the connection is open), restart the debug arduino connection
+    if(key === 'arduino_update_serialport' && arduinoDebug.isSerialHealthy())  arduinoDebug.restart(config, ConnectionType.debug);
+
     // Emit that we succeeded
     client.emit('update-config-response', {success: true});
   });
@@ -86,7 +110,7 @@ io.on('connection', async (client: Socket) => {
 // Emit all Arduino updates to socket
 arduino.registerListener("main-listener", (data) => {
   io.emit("arduino-update", data);
-})
+});
 
 // Listen for an arduino HEX file to be ready to deploy
 // @ts-ignore
@@ -104,7 +128,7 @@ process.on("arduino-upload-ready", (filePath: string) => {
     // Remove old hex file
     fs.unlink(filePath, () => {});
   })
-})
+});
 
 
 process.on('SIGTERM', () => {

@@ -6,6 +6,11 @@ import {clearTimeout} from "timers";
 
 const heartbeatExpected = 10;
 
+export enum ConnectionType {
+  debug,
+  data,
+}
+
 type Listener = (payload: SocketServerTransmitMessage) => any;
 type ListenerPool = { [key: string]: Listener };
 
@@ -34,10 +39,16 @@ export default class Arduino {
   // Listener information
   private listeners: ListenerPool = {};
 
-  constructor(config: ConfigManager) {
+  constructor(config: ConfigManager, type: ConnectionType) {
     // Initialize connection info
-    this.port = config.getConfig().arduino_data_serialport;
-    this.baud = config.getConfig().arduino_data_baud;
+    if(type === ConnectionType.data) {
+      this.port = config.getConfig().arduino_data_serialport;
+      this.baud = config.getConfig().arduino_data_baud;
+    } else {
+      this.port = config.getConfig().arduino_update_serialport;
+      this.baud = 115200;
+    }
+
 
     // Setup serial
     this.serial = new SerialPort(this.port, {
@@ -52,14 +63,20 @@ export default class Arduino {
   /**
    * Restart the serial connection with potentially new parameters
    * @param config Config to use
+   * @param type Connection type (debug or data)
    */
-  public restart(config: ConfigManager) {
+  public restart(config: ConfigManager, type: ConnectionType) {
     // Close current connection (if open)
     this.closeConnection();
 
     // Open new connection
-    this.port = config.getConfig().arduino_data_serialport;
-    this.baud = config.getConfig().arduino_data_baud;
+    if(type === ConnectionType.data) {
+      this.port = config.getConfig().arduino_data_serialport;
+      this.baud = config.getConfig().arduino_data_baud;
+    } else {
+      this.port = config.getConfig().arduino_update_serialport;
+      this.baud = 115200;
+    }
 
     // Setup serial
     this.serial = new SerialPort(this.port, {
