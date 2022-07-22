@@ -1,12 +1,13 @@
 {
   "name": "busgui-backend",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Backend for the Bus GUI project",
   "main": "build/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsc && node build/index.js",
     "build": "tsc",
+    "build-frontend": "cd ../ && npm run build-frontend && npm run move-built-frontend && cd ../backend",
     "build-bin-win": "pkg . -t node14-win",
     "build-bin-linux": "pkg . -t node14-linux",
     "build-bin-arm64linux": "pkg . -t node14-linux-arm64"

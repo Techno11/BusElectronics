@@ -6,7 +6,8 @@ type BusInfo = {
   shore_water_pressure: number, // psi
   water_pump_run_state: WaterPumpRunState,
   water_flow: number, // gpm
-  current: number,
+  current: number, // amps
+  ac_voltage: number, // volts
   digital_inputs: number[],
   relays: boolean[],
   dimmers: number[]

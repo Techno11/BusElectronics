@@ -99,7 +99,7 @@ const WaterStatusTile = ({data}: IProps) => {
         {!!showTank &&
         <>
           <Typography variant={"h4"} color={calcColor(loadingPump)} display={"inline"}>
-            {data.water_percent ?? "---"}
+            {(data.water_percent ?? 0).toFixed(2)}
           </Typography>
           <Typography variant={"h6"} color={calcColor(loadingPump)} display={"inline"}>{" %"}</Typography>
           <Typography variant={"caption"} display={"block"}>Water Tank {overrideAuto ? " *" : ""}</Typography>
@@ -107,12 +107,12 @@ const WaterStatusTile = ({data}: IProps) => {
         }
         {!showTank &&
         <>
-          <Typography variant={"h4"} display={"inline"}>{data.shore_water_pressure ?? "---"}</Typography>
+          <Typography variant={"h4"} display={"inline"}>{(data.shore_water_pressure ?? 0).toFixed(2)}</Typography>
           <Typography variant={"h6"} display={"inline"}>{" psi"}</Typography>
           <Typography variant={"caption"} display={"block"}>Shore Water {overrideAuto ? " *" : ""}</Typography>
         </>
         }
-        <Typography variant={"h6"}>{data.water_flow ?? "---"} gpm</Typography>
+        <Typography variant={"h6"}>{(data.water_flow ?? 0).toFixed(2)} gpm</Typography>
       </Box>
 
 

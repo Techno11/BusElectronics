@@ -1,9 +1,10 @@
 import React from "react";
-import {Box, Grid, Typography} from "@mui/material";
+import {Box, Grid} from "@mui/material";
 import BusInfo from "../models/BusInfo";
 import WaterStatusTile from "../components/WaterStatusTile";
 import PropaneStatusTile from "../components/PropaneStatusTile";
 import {ElectricBolt, PropaneTank, WaterDamage} from "@mui/icons-material";
+import ACLoadTile from "../components/ACLoadTile";
 
 interface IProps {
   data: BusInfo
@@ -35,12 +36,9 @@ const Dashboard = ({data}: IProps) => {
             <PropaneStatusTile data={data}/>
           </Box>
 
-          <Box sx={{...cellSxBase, textAlign: "center", userSelect: "none"}}>
-            <Box>
-              <Typography variant={"h4"} display={"inline"}>{data.current ?? "---"}</Typography>
-              <Typography variant={"h6"} display={"inline"}>{" amps"}</Typography>
-              <Typography variant={"caption"} display={"flex"}>AC Load</Typography>
-            </Box>
+          {/* AC Power Draw */}
+          <Box sx={{...cellSxBase}}>
+            <ACLoadTile data={data}/>
           </Box>
         </Grid>
 

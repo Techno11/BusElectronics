@@ -71,12 +71,12 @@ const PropaneStatusTile = ({data}: IProps) => {
         }}
       >
         <Typography display={"inline"} variant={"h4"} color={calcColor(loadingPropane)}>
-          {data.propane_0 ?? "---"}
+          {(data.propane_0 ?? 0).toFixed(2)}
         </Typography>
         <Typography display={"inline"} variant={"h6"} color={calcColor(loadingPropane)}>{" psi"}</Typography>
         <Typography variant={"caption"} display={"flex"}>Propane Tanks</Typography>
         <Typography display={"inline"}variant={"h4"} color={calcColor(loadingPropane)}>
-          {data.propane_1 ?? "---"}
+          {(data.propane_1 ?? 0).toFixed(2)}
         </Typography>
         <Typography variant={"h6"} display={"inline"} color={calcColor(loadingPropane)}>{" psi"}</Typography>
       </Box>

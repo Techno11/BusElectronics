@@ -8,6 +8,7 @@ const heartbeatExpected = 10;
 
 type Listener = (payload: SocketServerTransmitMessage) => any;
 type ListenerPool = { [key: string]: Listener };
+
 /**
  * This class initializes a connection to our main bus arduino.
  */
