@@ -6,6 +6,17 @@
  *  FastLED - For Individually Adressable LEDs
  */
 
+// Debug Toggle
+// #define DEBUG 1
+
+#ifdef DEBUG
+  #define DEBUG_PRINT(x)  Serial.print (x)
+  #define DEBUG_PRINTLN(x) Serial.println (x)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINTLN(x)
+#endif
+
 /*** Input/Outputs ([Array Position] => [Physical Pin])
  ****** Mosfet Dimmers ******
  * 00 => 03 - ?
@@ -55,7 +66,7 @@
  */
 
 /* VERSION */
-#define VERSION 2
+#define VERSION 3
 
 /* Water Pump State */
 #define WATER_PUMP_AUTO 0
@@ -216,6 +227,9 @@ void loop() {
   // Get Current AC Draw
   readCurrent();
 
+  // Read AC Voltage
+  readACVoltage();
+
   // Read Main Tank
   readMainWater();
 
@@ -312,6 +326,10 @@ void doSerial() {
       command[commandPos] = inByte;
       commandPos++;
     } else {
+      DEBUG_PRINT("Recieved Command: ");
+      for(int i = 0; i < 7; i++) { DEBUG_PRINT(command[i]); }
+      DEBUG_PRINTLN();
+      
       // Start processing command
       int fixture = command[2];
       int mode = command[0];
@@ -373,6 +391,7 @@ void processLeds(int fixture, int red, int green, int blue, boolean on) {
 
 // Pseudo-json
 void sendStatus() {
+  const long start = millis();
   Serial3.print("{\"water_percent\":");
   Serial3.print(currentWaterPercent);
   Serial3.print(",\"version\":");
@@ -446,6 +465,11 @@ void sendStatus() {
   Serial3.print("]}");
   Serial3.flush();
   Serial3.println(""); // Tells Pi that we're done
+  
+  // Debug
+  DEBUG_PRINT("JSON Status Sent, Done in ");
+  DEBUG_PRINT((millis() - start) / 1000.0);
+  DEBUG_PRINTLN(" seconds.");
 }
 
 // Method to setup animations
@@ -492,12 +516,14 @@ void runAnimations() {
   }
 }
 
-void readVoltage() {
+// Read AC Voltage. Not sure if this is correct, but it works....
+void readACVoltage() {
   int raw = analogRead(analogPins[AC_VOLTAGE]);
-  // Voltage is read as a percentage of 250vac
-  currentACVoltage = (raw / 1024) * 250;
+  // Voltage is read as a percentage of 250vac, offset 40
+  currentACVoltage = ((raw - 40) / 1000.0) * 250;
 }
 
+// Current Variables
 float sum = 0;
 int counter = 0;
 long lastCurrentCheck = millis();
@@ -527,18 +553,28 @@ float readMainWater() {
   currentWaterPercent = raw / 1024.0;
 }
 
-// Method to read the current propane PSI. 150psi == 1024
+/* Method to read the current propane PSI. 150psi == 1024
+ * Max Pressure = 150 psi
+ */
 float readPropane() {
+  // Read Raw Values
   int raw1 = analogRead(analogPins[PROPANE_TANK_ONE]);
   int raw2 = analogRead(analogPins[PROPANE_TANK_TWO]);
-  currentPropanePressure[0] = (raw1 / 1024.0) * 150;
-  currentPropanePressure[1] = (raw2 / 1024.0) * 150;
+
+  // Convert Analog to PSI (These sensor's max at 150 PSI)
+  currentPropanePressure[0] = translatePressure(150, raw1);
+  currentPropanePressure[1] = translatePressure(150, raw2);
 }
 
-// Method to read the current shore water PSI. 100psi == 1024
+/* Method to read the current shore water PSI
+ * Max Pressure = 100psi
+ */
 float readShoreWaterPressure() {
+  // Read Pressure
   int raw = analogRead(analogPins[SHORE_WATER_PRESSURE]);
-  currentWaterPressure = (raw / 1024.0) * 150;
+
+  // Convert Analog to PSI (This sensor's max is 100psi)
+  currentWaterPressure = translatePressure(100, raw);
 }
 
 // Water flow interrupt function
@@ -567,4 +603,23 @@ void processFlow() {
     // Reattach innturrupt to start counting again
     attachInterrupt(digitalPinToInterrupt(WATER_FLOW_PIN), measureFlow, RISING); 
   }
+}
+
+/* Analog Pressure Sensor Analog Translation
+ *  The operating voltage of these Amazon sensors is 0.5v to 4.5v
+ *  Translated to analog values, thats 102.4 to 921.6
+ */
+float translatePressure(int maxPsi, int raw) {
+  // Constants
+  const float zeroReading = 102.4; // Analog Reading @ 0 psi
+  const float maxReading = 921.6; // Analog Reading @ Max psi
+  
+  // Translate our raw analog reading to PSI
+  float calc = ((raw - zeroReading) * maxPsi) / (maxReading - zeroReading);
+
+  // Ensure value doesn't read below 0
+  if(calc < 0) { calc = 0.0; }
+
+  // Return
+  return calc;
 }
