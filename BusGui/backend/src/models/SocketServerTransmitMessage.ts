@@ -12,7 +12,12 @@ type SocketServerInfoMessage = {
   data: BusInfo,
 }
 
-type SocketServerTransmitMessage = SocketServerHealthMessage | SocketServerInfoMessage;
+type SocketServerDebugMessage = {
+  type: "debug",
+  data: string,
+}
+
+type SocketServerTransmitMessage = SocketServerHealthMessage | SocketServerInfoMessage | SocketServerDebugMessage;
 
 export {
   SocketServerHealthMessage,

@@ -42,11 +42,15 @@ const Settings = ({data}: IProps) => {
   const [error, setError] = useState<boolean>(false);
   const [upload, setUpload] = useState<string>("");
   const [dialogState, setDialogState] = useState<DialogState>(DialogState.NONE);
+  const [debugEnabled, setDebugEnabled] = useState<boolean>(false);
+  const [debugBuffer, setDebugBuffer] = useState<string>("");
 
   // Refs
   const uploadRef = useRef<HTMLInputElement>();
+  const debugBufferRef = useRef<string>(debugBuffer);
 
   useEffect(() => {
+    // Get settings
     bus.getConfig().then(data => {
       if (data) {
         setConfig(data.config);
@@ -55,8 +59,40 @@ const Settings = ({data}: IProps) => {
       } else {
         setError(true);
       }
-    })
+    });
+
+    // Check status of debug
+    debugStatusCheck();
+
+    // Register listener for debug data
+    bus.addListener("settings-page", data => {
+      if(data.type === "debug") {
+        appendDebugBuffer(data.data);
+      }
+    });
   }, []); // eslint-disable-line
+
+  // Status check
+  const debugStatusCheck = () => {
+    // Check status of debug
+    bus.getDebugEnabled().then(enabled => {
+      setDebugEnabled(enabled);
+    });
+  };
+
+  const appendDebugBuffer = (n: string) => {
+    updateBuffer(debugBufferRef.current + n);
+  };
+
+  const clearBuffer = () => {
+    updateBuffer("");
+    debugStatusCheck();
+  };
+
+  const updateBuffer = (val: string) => {
+    debugBufferRef.current = val;
+    setDebugBuffer(val);
+  };
 
   const runUpload = () => {
     if(!uploadRef.current || !uploadRef.current.files) return;
@@ -66,29 +102,35 @@ const Settings = ({data}: IProps) => {
       console.log(success);
       setDialogState(success ? DialogState.UPDATE_SUCCESS : DialogState.UPDATE_FAILURE);
     })
-  }
+  };
 
   const onUploadComplete = () => {
     if(dialogState === DialogState.UPLOADING) setDialogState(DialogState.UPDATING);
-  }
+  };
 
   const closeUpdateDialog = () => {
     setDialogState(DialogState.NONE);
     setUpload("");
     // Clear upload field
     if(uploadRef.current) uploadRef.current.value = "";
-  }
+  };
 
   const doServerRestart = () => {
     setDialogState(DialogState.RESTARTING);
     bus.restartServer().then(() => {
       setDialogState(DialogState.RESTART_SUCCESS);
     });
-  }
+  };
+
+  const doDebugToggle = () => {
+    bus.toggleDebug(!debugEnabled).then(success => {
+      if(success) setDebugEnabled(!debugEnabled);
+    });
+  };
 
   const doArduinoRestart = () => {
-
-  }
+    // heh
+  };
 
   return (
     <>
@@ -188,6 +230,21 @@ const Settings = ({data}: IProps) => {
           </Box>
         </Grid>
 
+        {/* Debug */}
+        <Divider sx={{mt: 2}}>Debugging</Divider>
+        {debugEnabled &&
+          <Grid container direction={"column"}>
+            <Grid item>
+                <TextField value={debugBuffer} fullWidth />
+            </Grid>
+            <Grid item>
+                <Button variant={"contained"} fullWidth onClick={clearBuffer}>Clear Buffer</Button>
+            </Grid>
+          </Grid>
+        }
+        <Button variant={"contained"} onClick={doDebugToggle} fullWidth>{debugEnabled ? "Disable " : "Enable "}Debugging</Button>
+
+
         {/* Software Versions / Restart */}
         <Divider sx={{mt: 2}}>Software Versions</Divider>
         <Grid item sx={{display: "flex", textAlign: "center"}}>
@@ -234,6 +291,6 @@ const Settings = ({data}: IProps) => {
       </Dialog>
     </>
   )
-}
+};
 
 export default Settings;

@@ -43,7 +43,7 @@ export default class BusSocket {
   public runCommand(command: Command): Promise<boolean> {
     return new Promise(resolve => {
       if (Date.now() - this._lastReq > rateLimit) {
-        this._socket.on("control-response", json => {
+        this._socket.once("control-response", json => {
           resolve(json.success)
         })
         this._socket.emit("control", command);
@@ -59,7 +59,7 @@ export default class BusSocket {
    */
   public getConfig(): Promise<SocketConfigResponse | false> {
     return new Promise(resolve => {
-      this._socket.on("get-config-response", json => {
+      this._socket.once("get-config-response", json => {
         if (!json.success) resolve(false);
         else resolve(json);
       })
@@ -68,18 +68,30 @@ export default class BusSocket {
   }
 
   /**
+   * Get Debug Status
+   */
+  public getDebugEnabled(): Promise<boolean> {
+    return new Promise(resolve => {
+      this._socket.once("debug-status-response", json => {
+        resolve(json.status);
+      });
+      this._socket.emit("debug-status");
+    });
+  }
+
+  /**
    * Get status
    */
   public getStatus(): Promise<SocketMessageHeartbeat> {
     return new Promise(resolve => {
-      this._socket.on("get-status-response", json => {
+      this._socket.once("get-status-response", json => {
         resolve({
           type: "healthy",
           serial_healthy: json.serial_healthy,
           software_healthy: json.software_healthy,
           last_heartbeat: new Date(json.last_heartbeat)
         })
-      })
+      });
       this._socket.emit("get-status");
     })
   }
@@ -122,6 +134,19 @@ export default class BusSocket {
           resolve(false)
         });
     })
+  }
+
+  /**
+   * Start debug session
+   */
+  public toggleDebug(start: boolean): Promise<boolean> {
+    const str = start ? "start-debug" : "end-debug";
+    return new Promise(resolve => {
+      this._socket.once(str + "-response", json => {
+        resolve(json.success);
+      });
+      this._socket.emit(str);
+    });
   }
 
   /**

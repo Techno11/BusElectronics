@@ -79,8 +79,18 @@ io.on('connection', async (client: Socket) => {
   });
 
   client.on('start-debug', () => {
-    if(!arduinoDebug) {
-      client.emit('start-debug-response', {success: startDebug()});
+    if(!arduinoDebug || !arduinoDebug.isSerialHealthy()) {
+      client.emit('start-debug-response', {success: startDebug(), was_ready: false});
+    } else {
+      client.emit('start-debug-response', {success: true, was_ready: true});
+    }
+  });
+
+  client.on('end-debug', () => {
+    if(arduinoDebug && arduinoDebug.isSerialHealthy()) {
+      client.emit('end-debug-response', {success: arduinoDebug.close(), was_ended: false});
+    } else {
+      client.emit('end-debug-response', {success: true, was_ended: true})
     }
   });
 
@@ -112,9 +122,17 @@ arduino.registerListener("main-listener", (data) => {
   io.emit("arduino-update", data);
 });
 
+arduinoDebug.registerListener("main-listener", (data) => {
+  io.emit("arduino-debug", data);
+});
+
 // Listen for an arduino HEX file to be ready to deploy
 // @ts-ignore
 process.on("arduino-upload-ready", (filePath: string) => {
+  // Close arduino debug line, emit debug closed
+  arduinoDebug.close();
+  io.emit('debug-closed');
+  // Create new AvrGirl to flash
   const mega = new Avrgirl({
     board: 'mega',
     port: config.getConfig().arduino_update_serialport

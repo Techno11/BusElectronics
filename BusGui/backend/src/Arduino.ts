@@ -89,6 +89,14 @@ export default class Arduino {
   }
 
   /**
+   * Close Connection
+   */
+  public close(): boolean {
+    this.closeConnection();
+    return true;
+  }
+
+  /**
    * Close current serial connection
    * @private
    */
@@ -96,6 +104,8 @@ export default class Arduino {
     // Close current connection
     if (this.serial && this.serial.isOpen) this.serial.close();
     if (this.serial) this.serial.destroy();
+
+    this.connected = false;
 
     // Clear heartbeat timeout
     clearTimeout(this.heartbeatTimeout);
